@@ -1,9 +1,13 @@
 import { useState } from 'react';
 
 import BarcodeScanner from '@/components/BarcodeScanner';
+import EditLineItemModal from '@/components/EditLineItemModal';
 import LineItemRow from '@/components/LineItemRow';
+import ProductPhotoInput from '@/components/ProductPhotoInput';
+import ScanConfirmModal from '@/components/ScanConfirmModal';
 import TextCommandInput from '@/components/TextCommandInput';
 import { useActiveTrip } from '@/hooks/useActiveTrip';
+import type { LineItem, PendingScan } from '@/db/schema';
 
 export default function ShopPage() {
   const {
@@ -12,16 +16,24 @@ export default function ShopPage() {
     statusMessage,
     clearStatusMessage,
     handleBarcodeScan,
+    confirmScanAdd,
     saveManualProduct,
+    updateLineItemDetails,
+    removeLineItem,
     handleTextCommand,
     addManualItem,
     startNewTrip,
   } = useActiveTrip();
 
   const [scannerOpen, setScannerOpen] = useState(false);
+  const [pendingScan, setPendingScan] = useState<PendingScan | null>(null);
   const [manualBarcode, setManualBarcode] = useState<string | null>(null);
   const [manualName, setManualName] = useState('');
   const [manualPrice, setManualPrice] = useState('');
+  const [manualQty, setManualQty] = useState('1');
+  const [manualImageBlob, setManualImageBlob] = useState<Blob | null>(null);
+  const [manualPreviewUrl, setManualPreviewUrl] = useState<string | null>(null);
+  const [editingItem, setEditingItem] = useState<(LineItem & { id: number }) | null>(null);
   const [itemName, setItemName] = useState('');
   const [itemQty, setItemQty] = useState('1');
   const [itemPrice, setItemPrice] = useState('');
@@ -29,26 +41,45 @@ export default function ShopPage() {
   async function onScan(barcode: string) {
     const result = await handleBarcodeScan(barcode);
 
-    if (result.needsManualEntry) {
+    if ('needsManualEntry' in result) {
       setManualBarcode(result.barcode);
       setManualName('');
       setManualPrice('');
+      setManualQty('1');
+      setManualImageBlob(null);
+      setManualPreviewUrl(null);
       setScannerOpen(false);
+      return;
     }
+
+    setPendingScan(result);
+    setScannerOpen(false);
   }
 
   async function submitManualProduct() {
     if (!manualBarcode || !manualName.trim()) return;
 
+    const parsedPrice = parseFloat(manualPrice);
+    const parsedQty = parseFloat(manualQty);
+
+    if (!Number.isFinite(parsedPrice) || parsedPrice < 0) return;
+    if (!Number.isFinite(parsedQty) || parsedQty <= 0) return;
+
     await saveManualProduct({
       barcode: manualBarcode,
       name: manualName.trim(),
-      unitPrice: parseFloat(manualPrice) || 0,
+      unitPrice: parsedPrice,
+      quantity: parsedQty,
+      imageBlob: manualImageBlob,
     });
 
     setManualBarcode(null);
     setManualName('');
     setManualPrice('');
+    setManualQty('1');
+    setManualImageBlob(null);
+    if (manualPreviewUrl) URL.revokeObjectURL(manualPreviewUrl);
+    setManualPreviewUrl(null);
   }
 
   async function submitManualItem(e: React.FormEvent) {
@@ -127,7 +158,9 @@ export default function ShopPage() {
         {items.length === 0 ? (
           <p className="empty">Scan or add your first item.</p>
         ) : (
-          items.map((item) => <LineItemRow key={item.id} item={item} />)
+          items.map((item) => (
+            <LineItemRow key={item.id} item={item} onPress={() => setEditingItem(item)} />
+          ))
         )}
       </section>
 
@@ -137,23 +170,76 @@ export default function ShopPage() {
         </div>
       ) : null}
 
+      {pendingScan ? (
+        <ScanConfirmModal
+          productName={pendingScan.productName}
+          barcode={pendingScan.barcode}
+          defaultUnitPrice={pendingScan.defaultUnitPrice}
+          existingImageBlob={pendingScan.imageBlob}
+          onConfirm={async ({ quantity, unitPrice, imageBlob, imageChanged }) => {
+            await confirmScanAdd({
+              barcode: pendingScan.barcode,
+              productName: pendingScan.productName,
+              category: pendingScan.category,
+              quantity,
+              unitPrice,
+              imageBlob,
+              imageChanged,
+            });
+            setPendingScan(null);
+          }}
+          onClose={() => setPendingScan(null)}
+        />
+      ) : null}
+
       {manualBarcode ? (
         <div className="modal-overlay modal-overlay-dim">
           <div className="modal-card">
             <h2>Unknown product</h2>
             <p className="hint">Barcode: {manualBarcode}</p>
+            <label className="field-label" htmlFor="manual-name">
+              Product name
+            </label>
             <input
+              id="manual-name"
               className="input"
               placeholder="Product name"
               value={manualName}
               onChange={(e) => setManualName(e.target.value)}
             />
+            <label className="field-label" htmlFor="manual-qty">
+              Quantity
+            </label>
             <input
+              id="manual-qty"
+              className="input"
+              inputMode="decimal"
+              value={manualQty}
+              onChange={(e) => setManualQty(e.target.value)}
+            />
+            <label className="field-label" htmlFor="manual-price">
+              Unit price
+            </label>
+            <input
+              id="manual-price"
               className="input"
               placeholder="Price"
               inputMode="decimal"
               value={manualPrice}
               onChange={(e) => setManualPrice(e.target.value)}
+            />
+            <ProductPhotoInput
+              previewUrl={manualPreviewUrl}
+              onImageSelected={async (blob) => {
+                if (manualPreviewUrl) URL.revokeObjectURL(manualPreviewUrl);
+                setManualImageBlob(blob);
+                setManualPreviewUrl(URL.createObjectURL(blob));
+              }}
+              onClear={() => {
+                if (manualPreviewUrl) URL.revokeObjectURL(manualPreviewUrl);
+                setManualImageBlob(null);
+                setManualPreviewUrl(null);
+              }}
             />
             <button type="button" className="btn-primary btn-block" onClick={submitManualProduct}>
               Save & add
@@ -163,6 +249,21 @@ export default function ShopPage() {
             </button>
           </div>
         </div>
+      ) : null}
+
+      {editingItem ? (
+        <EditLineItemModal
+          item={editingItem}
+          onSave={async (updates) => {
+            await updateLineItemDetails(editingItem.id, updates, editingItem.productId);
+            setEditingItem(null);
+          }}
+          onDelete={async () => {
+            await removeLineItem(editingItem.id);
+            setEditingItem(null);
+          }}
+          onClose={() => setEditingItem(null)}
+        />
       ) : null}
     </div>
   );

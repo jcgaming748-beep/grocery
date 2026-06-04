@@ -5,6 +5,16 @@ export type Product = {
   defaultUnitPrice: number | null;
   category: string | null;
   lastUsedAt: string | null;
+  imageBlob: Blob | null;
+};
+
+export type PendingScan = {
+  barcode: string;
+  productName: string;
+  productId: number | null;
+  category: string | null;
+  defaultUnitPrice: number | null;
+  imageBlob: Blob | null;
 };
 
 export type ShoppingTrip = {

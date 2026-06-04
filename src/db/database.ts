@@ -15,6 +15,23 @@ class GroceryDatabase extends Dexie {
       shoppingTrips: '++id, date',
       lineItems: '++id, tripId, [tripId+productName]',
     });
+
+    this.version(2)
+      .stores({
+        products: '++id, &barcode, lastUsedAt',
+        shoppingTrips: '++id, date',
+        lineItems: '++id, tripId, [tripId+productName]',
+      })
+      .upgrade(async (tx) => {
+        await tx
+          .table('products')
+          .toCollection()
+          .modify((product: Product) => {
+            if (product.imageBlob === undefined) {
+              product.imageBlob = null;
+            }
+          });
+      });
   }
 }
 

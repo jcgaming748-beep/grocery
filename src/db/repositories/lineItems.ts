@@ -30,6 +30,13 @@ export async function updateLineItemQuantity(id: number, quantity: number): Prom
   await db.lineItems.update(id, { quantity });
 }
 
+export async function updateLineItem(
+  id: number,
+  updates: { quantity?: number; unitPrice?: number },
+): Promise<void> {
+  await db.lineItems.update(id, updates);
+}
+
 export async function deleteLineItem(id: number): Promise<void> {
   await db.lineItems.delete(id);
 }

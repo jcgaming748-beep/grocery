@@ -1,9 +1,14 @@
 import { useCallback, useMemo, useState } from 'react';
 
-import { addLineItem, deleteLineItem, listLineItemsForTrip, updateLineItemQuantity } from '@/db/repositories/lineItems';
-import { getProductByBarcode, upsertProduct } from '@/db/repositories/products';
+import {
+  addLineItem,
+  deleteLineItem,
+  listLineItemsForTrip,
+  updateLineItem,
+} from '@/db/repositories/lineItems';
+import { getProductByBarcode, upsertProduct, updateProductPrice } from '@/db/repositories/products';
 import { createTrip } from '@/db/repositories/trips';
-import type { LineItem } from '@/db/schema';
+import type { LineItem, PendingScan } from '@/db/schema';
 import { lookupBarcodeOnline } from '@/services/barcodeLookup';
 import { fuzzyMatchProductName, parseTextCommand } from '@/services/textCommandParser';
 
@@ -31,63 +36,95 @@ export function useActiveTrip(initialTripId?: number) {
   );
 
   const handleBarcodeScan = useCallback(
-    async (barcode: string) => {
-      const activeTripId = await ensureTrip();
+    async (barcode: string): Promise<PendingScan | { needsManualEntry: true; barcode: string }> => {
+      await ensureTrip();
+
       const localProduct = await getProductByBarcode(barcode);
 
       if (localProduct) {
-        const item = await addLineItem({
-          tripId: activeTripId,
-          productName: localProduct.name,
+        return {
           barcode,
-          quantity: 1,
-          unitPrice: localProduct.defaultUnitPrice ?? 0,
+          productName: localProduct.name,
           productId: localProduct.id ?? null,
-        });
-        await refreshItems(activeTripId);
-        setStatusMessage(`Added ${item.productName}`);
-        return { needsManualEntry: false as const };
+          category: localProduct.category,
+          defaultUnitPrice: localProduct.defaultUnitPrice,
+          imageBlob: localProduct.imageBlob ?? null,
+        };
       }
 
       const online = await lookupBarcodeOnline(barcode);
 
       if (online) {
-        const product = await upsertProduct({
+        return {
           barcode,
-          name: online.name,
+          productName: online.name,
+          productId: null,
           category: online.category,
-        });
-        const item = await addLineItem({
-          tripId: activeTripId,
-          productName: product.name,
-          barcode,
-          quantity: 1,
-          unitPrice: product.defaultUnitPrice ?? 0,
-          productId: product.id ?? null,
-        });
-        await refreshItems(activeTripId);
-        setStatusMessage(`Added ${item.productName}`);
-        return { needsManualEntry: false as const };
+          defaultUnitPrice: null,
+          imageBlob: null,
+        };
       }
 
-      return { needsManualEntry: true as const, barcode };
+      return { needsManualEntry: true, barcode };
+    },
+    [ensureTrip],
+  );
+
+  const confirmScanAdd = useCallback(
+    async (input: {
+      barcode: string;
+      productName: string;
+      category: string | null;
+      quantity: number;
+      unitPrice: number;
+      imageBlob: Blob | null;
+      imageChanged: boolean;
+    }) => {
+      const activeTripId = await ensureTrip();
+
+      const product = await upsertProduct({
+        barcode: input.barcode,
+        name: input.productName,
+        category: input.category,
+        defaultUnitPrice: input.unitPrice,
+        imageBlob: input.imageChanged ? input.imageBlob : undefined,
+      });
+
+      await addLineItem({
+        tripId: activeTripId,
+        productName: product.name,
+        barcode: input.barcode,
+        quantity: input.quantity,
+        unitPrice: input.unitPrice,
+        productId: product.id ?? null,
+      });
+
+      await refreshItems(activeTripId);
+      setStatusMessage(`Added ${product.name}`);
     },
     [ensureTrip, refreshItems],
   );
 
   const saveManualProduct = useCallback(
-    async (input: { barcode: string; name: string; unitPrice: number }) => {
+    async (input: {
+      barcode: string;
+      name: string;
+      unitPrice: number;
+      quantity?: number;
+      imageBlob?: Blob | null;
+    }) => {
       const activeTripId = await ensureTrip();
       const product = await upsertProduct({
         barcode: input.barcode,
         name: input.name,
         defaultUnitPrice: input.unitPrice,
+        imageBlob: input.imageBlob ?? null,
       });
       await addLineItem({
         tripId: activeTripId,
         productName: product.name,
         barcode: input.barcode,
-        quantity: 1,
+        quantity: input.quantity ?? 1,
         unitPrice: input.unitPrice,
         productId: product.id ?? null,
       });
@@ -95,6 +132,36 @@ export function useActiveTrip(initialTripId?: number) {
       setStatusMessage(`Saved and added ${product.name}`);
     },
     [ensureTrip, refreshItems],
+  );
+
+  const updateLineItemDetails = useCallback(
+    async (
+      lineItemId: number,
+      updates: { quantity: number; unitPrice: number },
+      productId: number | null,
+    ) => {
+      const activeTripId = tripId ?? (await ensureTrip());
+
+      await updateLineItem(lineItemId, updates);
+
+      if (productId != null) {
+        await updateProductPrice(productId, updates.unitPrice);
+      }
+
+      await refreshItems(activeTripId);
+      setStatusMessage('Item updated.');
+    },
+    [ensureTrip, refreshItems, tripId],
+  );
+
+  const removeLineItem = useCallback(
+    async (lineItemId: number) => {
+      const activeTripId = tripId ?? (await ensureTrip());
+      await deleteLineItem(lineItemId);
+      await refreshItems(activeTripId);
+      setStatusMessage('Item removed.');
+    },
+    [ensureTrip, refreshItems, tripId],
   );
 
   const handleTextCommand = useCallback(
@@ -138,7 +205,7 @@ export function useActiveTrip(initialTripId?: number) {
         return;
       }
 
-      await updateLineItemQuantity(target.id, command.quantity);
+      await updateLineItem(target.id, { quantity: command.quantity });
       await refreshItems(activeTripId);
       setStatusMessage(`Updated ${matchedName} to ${command.quantity}`);
     },
@@ -183,7 +250,10 @@ export function useActiveTrip(initialTripId?: number) {
     statusMessage,
     clearStatusMessage: () => setStatusMessage(null),
     handleBarcodeScan,
+    confirmScanAdd,
     saveManualProduct,
+    updateLineItemDetails,
+    removeLineItem,
     handleTextCommand,
     addManualItem,
     loadTrip,
