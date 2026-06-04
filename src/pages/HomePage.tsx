@@ -1,8 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
 import SpendingSummaryCard from '@/components/SpendingSummaryCard';
-import { getSpendingSummary, listTripsWithTotals, createTrip } from '@/db/repositories/trips';
+import {
+  createTrip,
+  deleteTrip,
+  getSpendingSummary,
+  listTripsWithTotals,
+} from '@/db/repositories/trips';
 import type { TripWithTotal } from '@/db/schema';
 
 export default function HomePage() {
@@ -10,17 +15,28 @@ export default function HomePage() {
   const [trips, setTrips] = useState<TripWithTotal[]>([]);
   const [summary, setSummary] = useState({ weekTotal: 0, monthTotal: 0 });
 
-  useEffect(() => {
-    async function load() {
-      setTrips(await listTripsWithTotals());
-      setSummary(await getSpendingSummary());
-    }
-    load();
+  const refresh = useCallback(async () => {
+    setTrips(await listTripsWithTotals());
+    setSummary(await getSpendingSummary());
   }, []);
+
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
 
   async function handleNewTrip() {
     await createTrip();
     navigate('/shop');
+  }
+
+  async function handleDeleteTrip(trip: TripWithTotal) {
+    const label = new Date(trip.date).toLocaleString();
+    if (!window.confirm(`Delete trip from ${label}? This removes all ${trip.itemCount} items.`)) {
+      return;
+    }
+
+    await deleteTrip(trip.id);
+    await refresh();
   }
 
   return (
@@ -42,7 +58,7 @@ export default function HomePage() {
       ) : (
         <ul className="trip-list">
           {trips.map((trip) => (
-            <li key={trip.id}>
+            <li key={trip.id} className="trip-list-item">
               <Link to={`/trip/${trip.id}`} className="trip-row">
                 <div>
                   <div className="trip-date">{new Date(trip.date).toLocaleString()}</div>
@@ -52,6 +68,13 @@ export default function HomePage() {
                 </div>
                 <div className="trip-total">${trip.subtotal.toFixed(2)}</div>
               </Link>
+              <button
+                type="button"
+                className="btn-icon-delete"
+                aria-label="Delete trip"
+                onClick={() => handleDeleteTrip(trip)}>
+                ×
+              </button>
             </li>
           ))}
         </ul>

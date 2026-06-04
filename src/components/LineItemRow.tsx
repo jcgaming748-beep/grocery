@@ -8,9 +8,10 @@ import { lineItemTotal } from '@/db/schema';
 type Props = {
   item: LineItem & { id: number };
   onPress?: () => void;
+  onDelete?: () => void;
 };
 
-export default function LineItemRow({ item, onPress }: Props) {
+export default function LineItemRow({ item, onPress, onDelete }: Props) {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const isZeroPrice = item.unitPrice === 0;
 
@@ -40,7 +41,7 @@ export default function LineItemRow({ item, onPress }: Props) {
     };
   }, [item.productId]);
 
-  const content = (
+  const main = (
     <>
       {imageUrl ? (
         <img src={imageUrl} alt="" className="line-item-thumb" />
@@ -60,13 +61,24 @@ export default function LineItemRow({ item, onPress }: Props) {
     </>
   );
 
-  if (onPress) {
-    return (
-      <button type="button" className="line-item-row line-item-row-button" onClick={onPress}>
-        {content}
-      </button>
-    );
-  }
-
-  return <div className="line-item-row">{content}</div>;
+  return (
+    <div className="line-item-row">
+      {onPress ? (
+        <button type="button" className="line-item-main line-item-row-button" onClick={onPress}>
+          {main}
+        </button>
+      ) : (
+        <div className="line-item-main">{main}</div>
+      )}
+      {onDelete ? (
+        <button
+          type="button"
+          className="btn-icon-delete"
+          aria-label={`Delete ${item.productName}`}
+          onClick={onDelete}>
+          ×
+        </button>
+      ) : null}
+    </div>
+  );
 }

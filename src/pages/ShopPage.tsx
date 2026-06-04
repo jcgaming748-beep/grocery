@@ -159,7 +159,15 @@ export default function ShopPage() {
           <p className="empty">Scan or add your first item.</p>
         ) : (
           items.map((item) => (
-            <LineItemRow key={item.id} item={item} onPress={() => setEditingItem(item)} />
+            <LineItemRow
+              key={item.id}
+              item={item}
+              onPress={() => setEditingItem(item)}
+              onDelete={async () => {
+                if (!window.confirm(`Remove ${item.productName} from this trip?`)) return;
+                await removeLineItem(item.id);
+              }}
+            />
           ))
         )}
       </section>

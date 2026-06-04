@@ -175,6 +175,19 @@ input {
   padding: 0;
 }
 
+.trip-list-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.trip-list-item .trip-row {
+  flex: 1;
+  min-width: 0;
+  border-bottom: none;
+}
+
 .trip-row {
   display: flex;
   justify-content: space-between;
@@ -269,18 +282,26 @@ input {
 .line-item-row {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
   padding: 12px 0;
   border-bottom: 1px solid #e5e7eb;
-  width: 100%;
+}
+
+.line-item-main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  padding: 0;
   text-align: left;
+  color: inherit;
 }
 
 .line-item-row-button {
-  background: transparent;
-  border: none;
   cursor: pointer;
-  color: inherit;
 }
 
 .line-item-thumb {
@@ -342,6 +363,32 @@ input {
   border: 1px solid #fecaca;
   border-radius: 10px;
   cursor: pointer;
+}
+
+.trip-delete-button {
+  margin-top: 20px;
+}
+
+.btn-icon-delete {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fff;
+  color: #6b7280;
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-icon-delete:active {
+  background: #fee2e2;
+  color: #b91c1c;
+  border-color: #fecaca;
 }
 
 .photo-input {
@@ -509,6 +556,22 @@ input {
     background: #450a0a;
     color: #fecaca;
     border-color: #7f1d1d;
+  }
+
+  .btn-icon-delete {
+    background: #1f2937;
+    border-color: #374151;
+    color: #9ca3af;
+  }
+
+  .btn-icon-delete:active {
+    background: #450a0a;
+    color: #fecaca;
+    border-color: #7f1d1d;
+  }
+
+  .trip-list-item {
+    border-bottom-color: #374151;
   }
 
   .trip-row,

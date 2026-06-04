@@ -64,3 +64,8 @@ export async function getSpendingSummary(): Promise<{ weekTotal: number; monthTo
 
   return { weekTotal, monthTotal };
 }
+
+export async function deleteTrip(id: number): Promise<void> {
+  await db.lineItems.where('tripId').equals(id).delete();
+  await db.shoppingTrips.delete(id);
+}
