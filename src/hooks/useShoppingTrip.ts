@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import {
   addLineItem,
@@ -7,13 +7,14 @@ import {
   updateLineItem,
 } from '@/db/repositories/lineItems';
 import { getProductByBarcode, upsertProduct, updateProductPrice } from '@/db/repositories/products';
-import { createTrip } from '@/db/repositories/trips';
+import { acceptReceiptTotal, getActiveTripByStatus } from '@/db/repositories/trips';
 import type { LineItem, PendingScan } from '@/db/schema';
+import { sumLineItems } from '@/db/schema';
 import { lookupBarcodeOnline } from '@/services/barcodeLookup';
 import { fuzzyMatchProductName, parseTextCommand } from '@/services/textCommandParser';
 
-export function useActiveTrip(initialTripId?: number) {
-  const [tripId, setTripId] = useState<number | null>(initialTripId ?? null);
+export function useShoppingTrip() {
+  const [tripId, setTripId] = useState<number | null>(null);
   const [items, setItems] = useState<(LineItem & { id: number })[]>([]);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
@@ -21,19 +22,28 @@ export function useActiveTrip(initialTripId?: number) {
     setItems(await listLineItemsForTrip(id));
   }, []);
 
+  const loadShoppingTrip = useCallback(async () => {
+    const trip = await getActiveTripByStatus('shopping');
+    if (trip) {
+      setTripId(trip.id);
+      await refreshItems(trip.id);
+      return trip;
+    }
+    setTripId(null);
+    setItems([]);
+    return null;
+  }, [refreshItems]);
+
+  useEffect(() => {
+    loadShoppingTrip();
+  }, [loadShoppingTrip]);
+
+  const subtotal = useMemo(() => sumLineItems(items), [items]);
+
   const ensureTrip = useCallback(async (): Promise<number> => {
     if (tripId != null) return tripId;
-
-    const trip = await createTrip();
-    setTripId(trip.id);
-    await refreshItems(trip.id);
-    return trip.id;
-  }, [refreshItems, tripId]);
-
-  const subtotal = useMemo(
-    () => items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0),
-    [items],
-  );
+    throw new Error('No active shopping trip. Start shopping from the List tab.');
+  }, [tripId]);
 
   const handleBarcodeScan = useCallback(
     async (barcode: string): Promise<PendingScan | { needsManualEntry: true; barcode: string }> => {
@@ -90,19 +100,34 @@ export function useActiveTrip(initialTripId?: number) {
         imageBlob: input.imageChanged ? input.imageBlob : undefined,
       });
 
-      await addLineItem({
-        tripId: activeTripId,
-        productName: product.name,
-        barcode: input.barcode,
-        quantity: input.quantity,
-        unitPrice: input.unitPrice,
-        productId: product.id ?? null,
-      });
+      const matchedLine = items.find(
+        (item) =>
+          item.productId === product.id ||
+          fuzzyMatchProductName(product.name, [item.productName]) === item.productName,
+      );
+
+      if (matchedLine?.id) {
+        await updateLineItem(matchedLine.id, {
+          quantity: matchedLine.quantity + input.quantity,
+          unitPrice: input.unitPrice,
+          productId: product.id ?? null,
+          barcode: input.barcode,
+        });
+      } else {
+        await addLineItem({
+          tripId: activeTripId,
+          productName: product.name,
+          barcode: input.barcode,
+          quantity: input.quantity,
+          unitPrice: input.unitPrice,
+          productId: product.id ?? null,
+        });
+      }
 
       await refreshItems(activeTripId);
       setStatusMessage(`Added ${product.name}`);
     },
-    [ensureTrip, refreshItems],
+    [ensureTrip, items, refreshItems],
   );
 
   const saveManualProduct = useCallback(
@@ -140,34 +165,32 @@ export function useActiveTrip(initialTripId?: number) {
       updates: { quantity: number; unitPrice: number },
       productId: number | null,
     ) => {
-      const activeTripId = tripId ?? (await ensureTrip());
+      if (tripId == null) return;
 
       await updateLineItem(lineItemId, updates);
-
       if (productId != null) {
         await updateProductPrice(productId, updates.unitPrice);
       }
-
-      await refreshItems(activeTripId);
+      await refreshItems(tripId);
       setStatusMessage('Item updated.');
     },
-    [ensureTrip, refreshItems, tripId],
+    [refreshItems, tripId],
   );
 
   const removeLineItem = useCallback(
     async (lineItemId: number) => {
-      const activeTripId = tripId ?? (await ensureTrip());
+      if (tripId == null) return;
+
       await deleteLineItem(lineItemId);
-      await refreshItems(activeTripId);
+      await refreshItems(tripId);
       setStatusMessage('Item removed.');
     },
-    [ensureTrip, refreshItems, tripId],
+    [refreshItems, tripId],
   );
 
   const handleTextCommand = useCallback(
     async (text: string) => {
       const command = parseTextCommand(text);
-
       if (!command) {
         setStatusMessage('Could not understand command. Try: add 2 milk at 3.49');
         return;
@@ -189,7 +212,6 @@ export function useActiveTrip(initialTripId?: number) {
       }
 
       const matchedName = fuzzyMatchProductName(command.productName, productNames);
-
       if (!matchedName) {
         setStatusMessage(`No item matching "${command.productName}" on this trip.`);
         return;
@@ -227,20 +249,16 @@ export function useActiveTrip(initialTripId?: number) {
     [ensureTrip, refreshItems],
   );
 
-  const startNewTrip = useCallback(async () => {
-    const trip = await createTrip();
-    setTripId(trip.id);
-    setItems([]);
-    setStatusMessage('Started new shopping trip.');
-    return trip.id;
-  }, []);
+  const finishWithReceiptTotal = useCallback(
+    async (total: number) => {
+      if (tripId == null) return;
 
-  const loadTrip = useCallback(
-    async (id: number) => {
-      setTripId(id);
-      await refreshItems(id);
+      await acceptReceiptTotal(tripId, total);
+      setTripId(null);
+      setItems([]);
+      setStatusMessage('Receipt total saved. Ready for review at home.');
     },
-    [refreshItems],
+    [tripId],
   );
 
   return {
@@ -249,6 +267,7 @@ export function useActiveTrip(initialTripId?: number) {
     subtotal,
     statusMessage,
     clearStatusMessage: () => setStatusMessage(null),
+    loadShoppingTrip,
     handleBarcodeScan,
     confirmScanAdd,
     saveManualProduct,
@@ -256,7 +275,6 @@ export function useActiveTrip(initialTripId?: number) {
     removeLineItem,
     handleTextCommand,
     addManualItem,
-    loadTrip,
-    startNewTrip,
+    finishWithReceiptTotal,
   };
 }

@@ -45,6 +45,222 @@ input {
   padding-bottom: 72px;
 }
 
+.page-with-footer {
+  padding-bottom: 120px;
+}
+
+.sticky-footer {
+  position: fixed;
+  bottom: calc(56px + env(safe-area-inset-bottom));
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 480px;
+  padding: 12px 16px;
+  background: rgba(255, 255, 255, 0.96);
+  border-top: 1px solid #e5e7eb;
+  backdrop-filter: blur(8px);
+}
+
+.sticky-footer-summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  font-weight: 600;
+}
+
+.sticky-footer-amount {
+  font-size: 1.25rem;
+}
+
+.sticky-footer-hint {
+  text-align: center;
+  margin: 8px 0 0;
+}
+
+.link-button {
+  display: block;
+  text-align: center;
+  text-decoration: none;
+  color: #fff;
+}
+
+.review-link {
+  margin: 12px 0;
+}
+
+.advanced-toggle {
+  width: 100%;
+  margin: 16px 0 8px;
+}
+
+.advanced-tools {
+  margin-bottom: 24px;
+}
+
+.autocomplete {
+  margin-bottom: 16px;
+}
+
+.autocomplete-form {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+}
+
+.autocomplete-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.autocomplete-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 12px;
+  border: none;
+  border-bottom: 1px solid #e5e7eb;
+  background: #fff;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+}
+
+.autocomplete-option:last-child {
+  border-bottom: none;
+}
+
+.autocomplete-option-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.autocomplete-option-name {
+  font-weight: 600;
+}
+
+.autocomplete-option-price {
+  font-size: 0.875rem;
+  color: #6b7280;
+}
+
+.trip-date-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.trip-badge {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #e5e7eb;
+  color: #374151;
+}
+
+.trip-badge-planning {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.trip-badge-shopping {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.trip-badge-pending-review {
+  background: #fce7f3;
+  color: #9d174d;
+}
+
+.trip-badge-complete {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.review-summary {
+  background: #f3f4f6;
+  border-radius: 12px;
+  padding: 12px 16px;
+  margin-bottom: 12px;
+}
+
+.review-summary-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 0;
+  font-weight: 600;
+}
+
+.review-summary-warning {
+  color: #dc2626;
+}
+
+.review-line-item {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.review-line-item-confirmed {
+  background: #dcfce7;
+  border-radius: 8px;
+  border-bottom-color: transparent;
+  margin-bottom: 4px;
+}
+
+.review-line-main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+  padding: 12px 8px;
+  border: none;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+}
+
+.review-line-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.review-check {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: #166534;
+}
+
+.btn-icon-edit {
+  flex-shrink: 0;
+  width: 36px;
+  align-self: center;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fff;
+  color: #6b7280;
+  cursor: pointer;
+}
+
 .page {
   padding: 16px;
 }
@@ -73,6 +289,10 @@ input {
   border-top: 1px solid #e5e7eb;
   background: #fff;
   padding-bottom: env(safe-area-inset-bottom);
+}
+
+.bottom-nav-three {
+  grid-template-columns: 1fr 1fr 1fr;
 }
 
 .nav-link {
@@ -572,6 +792,34 @@ input {
 
   .trip-list-item {
     border-bottom-color: #374151;
+  }
+
+  .sticky-footer {
+    background: rgba(17, 24, 39, 0.96);
+    border-top-color: #374151;
+  }
+
+  .autocomplete-list,
+  .autocomplete-option {
+    background: #1f2937;
+    border-color: #374151;
+  }
+
+  .autocomplete-option {
+    border-bottom-color: #374151;
+  }
+
+  .review-summary {
+    background: #1f2937;
+  }
+
+  .review-line-item-confirmed {
+    background: #14532d;
+  }
+
+  .btn-icon-edit {
+    background: #1f2937;
+    border-color: #374151;
   }
 
   .trip-row,

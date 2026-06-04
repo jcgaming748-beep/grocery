@@ -54,3 +54,19 @@ export async function updateProductPrice(id: number, defaultUnitPrice: number): 
 export async function updateProductImage(id: number, imageBlob: Blob | null): Promise<void> {
   await db.products.update(id, { imageBlob });
 }
+
+export async function searchProductsByName(query: string, limit = 8): Promise<Product[]> {
+  const normalized = query.trim().toLowerCase();
+  if (!normalized) return listRecentProducts(limit);
+
+  const products = await db.products.orderBy('lastUsedAt').reverse().toArray();
+
+  return products
+    .filter((product) => product.name.toLowerCase().includes(normalized))
+    .slice(0, limit);
+}
+
+export async function listRecentProducts(limit = 8): Promise<Product[]> {
+  const products = await db.products.orderBy('lastUsedAt').reverse().toArray();
+  return products.filter((p) => p.lastUsedAt != null).slice(0, limit);
+}

@@ -17,11 +17,15 @@ export type PendingScan = {
   imageBlob: Blob | null;
 };
 
+export type TripStatus = 'planning' | 'shopping' | 'pending_review' | 'complete';
+
 export type ShoppingTrip = {
   id?: number;
   date: string;
   storeName: string | null;
   notes: string | null;
+  status: TripStatus;
+  receiptTotal: number | null;
 };
 
 export type LineItem = {
@@ -32,6 +36,7 @@ export type LineItem = {
   quantity: number;
   unitPrice: number;
   productId: number | null;
+  confirmed: boolean;
 };
 
 export type TripWithTotal = ShoppingTrip & {
@@ -43,3 +48,41 @@ export type TripWithTotal = ShoppingTrip & {
 export function lineItemTotal(item: Pick<LineItem, 'quantity' | 'unitPrice'>): number {
   return item.quantity * item.unitPrice;
 }
+
+export function sumLineItems(items: Pick<LineItem, 'quantity' | 'unitPrice'>[]): number {
+  return items.reduce((sum, item) => sum + lineItemTotal(item), 0);
+}
+
+export function sumConfirmedLineItems(
+  items: Pick<LineItem, 'quantity' | 'unitPrice' | 'confirmed'>[],
+): number {
+  return items
+    .filter((item) => item.confirmed)
+    .reduce((sum, item) => sum + lineItemTotal(item), 0);
+}
+
+export function computeTripDisplayTotal(
+  trip: Pick<ShoppingTrip, 'status' | 'receiptTotal'>,
+  items: Pick<LineItem, 'quantity' | 'unitPrice' | 'confirmed'>[],
+): number {
+  const lineSum = sumLineItems(items);
+
+  switch (trip.status) {
+    case 'planning':
+    case 'shopping':
+      return lineSum;
+    case 'pending_review':
+      return trip.receiptTotal ?? lineSum;
+    case 'complete':
+      return lineSum;
+    default:
+      return lineSum;
+  }
+}
+
+export const TRIP_STATUS_LABELS: Record<TripStatus, string> = {
+  planning: 'Planning',
+  shopping: 'Shopping',
+  pending_review: 'Needs review',
+  complete: 'Complete',
+};

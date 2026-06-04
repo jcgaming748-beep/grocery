@@ -1,21 +1,22 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 
-import EditLineItemModal from '@/components/EditLineItemModal';
 import LineItemRow from '@/components/LineItemRow';
-import { deleteLineItem, listLineItemsForTrip, updateLineItem } from '@/db/repositories/lineItems';
-import { updateProductPrice } from '@/db/repositories/products';
-import { deleteTrip, getTrip } from '@/db/repositories/trips';
-import type { LineItem, ShoppingTrip } from '@/db/schema';
-import { lineItemTotal } from '@/db/schema';
+import { listLineItemsForTrip } from '@/db/repositories/lineItems';
+import { getTrip } from '@/db/repositories/trips';
+import {
+  TRIP_STATUS_LABELS,
+  computeTripDisplayTotal,
+  lineItemTotal,
+  type LineItem,
+  type ShoppingTrip,
+} from '@/db/schema';
 
 export default function TripDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
   const tripId = Number(id);
   const [trip, setTrip] = useState<(ShoppingTrip & { id: number }) | null>(null);
   const [items, setItems] = useState<(LineItem & { id: number })[]>([]);
-  const [editingItem, setEditingItem] = useState<(LineItem & { id: number }) | null>(null);
 
   const refresh = useCallback(async () => {
     const t = await getTrip(tripId);
@@ -29,37 +30,6 @@ export default function TripDetailPage() {
     refresh();
   }, [refresh]);
 
-  async function handleDeleteItem(item: LineItem & { id: number }) {
-    if (!window.confirm(`Remove ${item.productName} from this trip?`)) return;
-
-    await deleteLineItem(item.id);
-    await refresh();
-  }
-
-  async function handleSaveItem(
-    item: LineItem & { id: number },
-    updates: { quantity: number; unitPrice: number },
-  ) {
-    await updateLineItem(item.id, updates);
-
-    if (item.productId != null) {
-      await updateProductPrice(item.productId, updates.unitPrice);
-    }
-
-    setEditingItem(null);
-    await refresh();
-  }
-
-  async function handleDeleteTrip() {
-    if (!trip) return;
-
-    const label = new Date(trip.date).toLocaleString();
-    if (!window.confirm(`Delete this entire trip from ${label}?`)) return;
-
-    await deleteTrip(trip.id);
-    navigate('/');
-  }
-
   if (!trip) {
     return (
       <div className="page">
@@ -69,7 +39,8 @@ export default function TripDetailPage() {
     );
   }
 
-  const subtotal = items.reduce((sum, item) => sum + lineItemTotal(item), 0);
+  const displayTotal = computeTripDisplayTotal(trip, items);
+  const lineSum = items.reduce((sum, item) => sum + lineItemTotal(item), 0);
 
   return (
     <div className="page">
@@ -81,6 +52,20 @@ export default function TripDetailPage() {
       </header>
 
       <p className="trip-date">{new Date(trip.date).toLocaleString()}</p>
+      <span className={`trip-badge trip-badge-${trip.status.replace('_', '-')}`}>
+        {TRIP_STATUS_LABELS[trip.status]}
+      </span>
+
+      {trip.status === 'pending_review' ? (
+        <Link to={`/trip/${trip.id}/review`} className="btn-primary btn-block link-button review-link">
+          Review receipt
+        </Link>
+      ) : null}
+
+      {trip.receiptTotal != null ? (
+        <p className="hint">Receipt total: ${trip.receiptTotal.toFixed(2)}</p>
+      ) : null}
+
       {trip.storeName ? <p>{trip.storeName}</p> : null}
       {trip.notes ? <p className="hint">{trip.notes}</p> : null}
 
@@ -88,37 +73,17 @@ export default function TripDetailPage() {
         {items.length === 0 ? (
           <p className="empty">No items on this trip.</p>
         ) : (
-          items.map((item) => (
-            <LineItemRow
-              key={item.id}
-              item={item}
-              onPress={() => setEditingItem(item)}
-              onDelete={() => handleDeleteItem(item)}
-            />
-          ))
+          items.map((item) => <LineItemRow key={item.id} item={item} />)
         )}
       </section>
 
       <footer className="trip-footer">
-        <span>Total</span>
-        <span className="trip-total-amount">${subtotal.toFixed(2)}</span>
+        <span>{trip.receiptTotal != null && trip.status === 'pending_review' ? 'Receipt total' : 'Total'}</span>
+        <span className="trip-total-amount">${displayTotal.toFixed(2)}</span>
       </footer>
 
-      <button type="button" className="btn-danger btn-block trip-delete-button" onClick={handleDeleteTrip}>
-        Delete trip
-      </button>
-
-      {editingItem ? (
-        <EditLineItemModal
-          item={editingItem}
-          onSave={(updates) => handleSaveItem(editingItem, updates)}
-          onDelete={async () => {
-            await deleteLineItem(editingItem.id);
-            setEditingItem(null);
-            await refresh();
-          }}
-          onClose={() => setEditingItem(null)}
-        />
+      {trip.receiptTotal != null && trip.status !== 'planning' && trip.status !== 'shopping' ? (
+        <p className="hint">Line items sum: ${lineSum.toFixed(2)}</p>
       ) : null}
     </div>
   );

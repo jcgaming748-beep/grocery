@@ -3,12 +3,16 @@ import { Link, useNavigate } from 'react-router-dom';
 
 import SpendingSummaryCard from '@/components/SpendingSummaryCard';
 import {
-  createTrip,
+  createPlanningTrip,
   deleteTrip,
   getSpendingSummary,
   listTripsWithTotals,
 } from '@/db/repositories/trips';
-import type { TripWithTotal } from '@/db/schema';
+import { TRIP_STATUS_LABELS, type TripStatus, type TripWithTotal } from '@/db/schema';
+
+function statusClass(status: TripStatus): string {
+  return `trip-badge trip-badge-${status.replace('_', '-')}`;
+}
 
 export default function HomePage() {
   const navigate = useNavigate();
@@ -24,9 +28,9 @@ export default function HomePage() {
     refresh();
   }, [refresh]);
 
-  async function handleNewTrip() {
-    await createTrip();
-    navigate('/shop');
+  async function handleNewList() {
+    await createPlanningTrip();
+    navigate('/list');
   }
 
   async function handleDeleteTrip(trip: TripWithTotal) {
@@ -39,6 +43,11 @@ export default function HomePage() {
     await refresh();
   }
 
+  function tripLink(trip: TripWithTotal): string {
+    if (trip.status === 'pending_review') return `/trip/${trip.id}/review`;
+    return `/trip/${trip.id}`;
+  }
+
   return (
     <div className="page">
       <header className="page-header">
@@ -47,23 +56,27 @@ export default function HomePage() {
 
       <SpendingSummaryCard weekTotal={summary.weekTotal} monthTotal={summary.monthTotal} />
 
-      <button type="button" className="btn-primary btn-block" onClick={handleNewTrip}>
-        Start new trip
+      <button type="button" className="btn-primary btn-block" onClick={handleNewList}>
+        New grocery list
       </button>
 
-      <h2 className="section-title">Past trips</h2>
+      <h2 className="section-title">Trips</h2>
 
       {trips.length === 0 ? (
-        <p className="empty">No trips yet. Start shopping!</p>
+        <p className="empty">No trips yet. Start a grocery list!</p>
       ) : (
         <ul className="trip-list">
           {trips.map((trip) => (
             <li key={trip.id} className="trip-list-item">
-              <Link to={`/trip/${trip.id}`} className="trip-row">
+              <Link to={tripLink(trip)} className="trip-row">
                 <div>
-                  <div className="trip-date">{new Date(trip.date).toLocaleString()}</div>
+                  <div className="trip-date-row">
+                    <span className="trip-date">{new Date(trip.date).toLocaleString()}</span>
+                    <span className={statusClass(trip.status)}>{TRIP_STATUS_LABELS[trip.status]}</span>
+                  </div>
                   <div className="trip-meta">
                     {trip.itemCount} items{trip.storeName ? ` · ${trip.storeName}` : ''}
+                    {trip.status === 'pending_review' ? ' · Tap to review' : ''}
                   </div>
                 </div>
                 <div className="trip-total">${trip.subtotal.toFixed(2)}</div>

@@ -32,6 +32,35 @@ class GroceryDatabase extends Dexie {
             }
           });
       });
+
+    this.version(3)
+      .stores({
+        products: '++id, &barcode, lastUsedAt',
+        shoppingTrips: '++id, date, status',
+        lineItems: '++id, tripId, [tripId+productName]',
+      })
+      .upgrade(async (tx) => {
+        await tx
+          .table('shoppingTrips')
+          .toCollection()
+          .modify((trip: ShoppingTrip) => {
+            if (trip.status === undefined) {
+              trip.status = 'complete';
+            }
+            if (trip.receiptTotal === undefined) {
+              trip.receiptTotal = null;
+            }
+          });
+
+        await tx
+          .table('lineItems')
+          .toCollection()
+          .modify((item: LineItem) => {
+            if (item.confirmed === undefined) {
+              item.confirmed = true;
+            }
+          });
+      });
   }
 }
 

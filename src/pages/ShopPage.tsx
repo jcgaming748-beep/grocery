@@ -1,16 +1,19 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 
+import AcceptTotalModal from '@/components/AcceptTotalModal';
 import BarcodeScanner from '@/components/BarcodeScanner';
 import EditLineItemModal from '@/components/EditLineItemModal';
 import LineItemRow from '@/components/LineItemRow';
 import ProductPhotoInput from '@/components/ProductPhotoInput';
 import ScanConfirmModal from '@/components/ScanConfirmModal';
 import TextCommandInput from '@/components/TextCommandInput';
-import { useActiveTrip } from '@/hooks/useActiveTrip';
+import { useShoppingTrip } from '@/hooks/useShoppingTrip';
 import type { LineItem, PendingScan } from '@/db/schema';
 
 export default function ShopPage() {
   const {
+    tripId,
     items,
     subtotal,
     statusMessage,
@@ -22,10 +25,12 @@ export default function ShopPage() {
     removeLineItem,
     handleTextCommand,
     addManualItem,
-    startNewTrip,
-  } = useActiveTrip();
+    finishWithReceiptTotal,
+  } = useShoppingTrip();
 
   const [scannerOpen, setScannerOpen] = useState(false);
+  const [acceptTotalOpen, setAcceptTotalOpen] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [pendingScan, setPendingScan] = useState<PendingScan | null>(null);
   const [manualBarcode, setManualBarcode] = useState<string | null>(null);
   const [manualName, setManualName] = useState('');
@@ -97,14 +102,29 @@ export default function ShopPage() {
     setItemPrice('');
   }
 
+  if (tripId == null) {
+    return (
+      <div className="page">
+        <header className="page-header">
+          <h1>Shopping</h1>
+        </header>
+        <p className="empty">No active shopping trip.</p>
+        <p className="hint">Build a list on the List tab, then tap Start shopping.</p>
+        <Link to="/list" className="btn-primary btn-block link-button">
+          Go to grocery list
+        </Link>
+      </div>
+    );
+  }
+
   return (
-    <div className="page">
+    <div className="page page-with-footer">
       <header className="page-header">
         <h1>Shopping</h1>
       </header>
 
       <div className="trip-total-banner">
-        <span className="trip-total-label">Trip total</span>
+        <span className="trip-total-label">Estimated total</span>
         <span className="trip-total-amount">${subtotal.toFixed(2)}</span>
       </div>
 
@@ -114,49 +134,9 @@ export default function ShopPage() {
         </button>
       ) : null}
 
-      <div className="action-row">
-        <button type="button" className="btn-primary" onClick={() => setScannerOpen(true)}>
-          Scan barcode
-        </button>
-        <button type="button" className="btn-secondary" onClick={startNewTrip}>
-          New trip
-        </button>
-      </div>
-
-      <TextCommandInput onSubmit={handleTextCommand} />
-
-      <form className="manual-form" onSubmit={submitManualItem}>
-        <h2 className="section-title">Manual add</h2>
-        <input
-          className="input"
-          placeholder="Product name"
-          value={itemName}
-          onChange={(e) => setItemName(e.target.value)}
-        />
-        <div className="manual-form-row">
-          <input
-            className="input"
-            placeholder="Qty"
-            inputMode="decimal"
-            value={itemQty}
-            onChange={(e) => setItemQty(e.target.value)}
-          />
-          <input
-            className="input"
-            placeholder="Price"
-            inputMode="decimal"
-            value={itemPrice}
-            onChange={(e) => setItemPrice(e.target.value)}
-          />
-          <button type="submit" className="btn-secondary">
-            Add
-          </button>
-        </div>
-      </form>
-
       <section className="item-list">
         {items.length === 0 ? (
-          <p className="empty">Scan or add your first item.</p>
+          <p className="empty">Your list is empty. You can still enter the receipt total below.</p>
         ) : (
           items.map((item) => (
             <LineItemRow
@@ -172,10 +152,76 @@ export default function ShopPage() {
         )}
       </section>
 
+      <button
+        type="button"
+        className="btn-link advanced-toggle"
+        onClick={() => setShowAdvanced((v) => !v)}>
+        {showAdvanced ? 'Hide scan & add tools' : 'Scan barcodes or add items (optional)'}
+      </button>
+
+      {showAdvanced ? (
+        <div className="advanced-tools">
+          <div className="action-row">
+            <button type="button" className="btn-primary" onClick={() => setScannerOpen(true)}>
+              Scan barcode
+            </button>
+          </div>
+
+          <TextCommandInput onSubmit={handleTextCommand} />
+
+          <form className="manual-form" onSubmit={submitManualItem}>
+            <h2 className="section-title">Manual add</h2>
+            <input
+              className="input"
+              placeholder="Product name"
+              value={itemName}
+              onChange={(e) => setItemName(e.target.value)}
+            />
+            <div className="manual-form-row">
+              <input
+                className="input"
+                placeholder="Qty"
+                inputMode="decimal"
+                value={itemQty}
+                onChange={(e) => setItemQty(e.target.value)}
+              />
+              <input
+                className="input"
+                placeholder="Price"
+                inputMode="decimal"
+                value={itemPrice}
+                onChange={(e) => setItemPrice(e.target.value)}
+              />
+              <button type="submit" className="btn-secondary">
+                Add
+              </button>
+            </div>
+          </form>
+        </div>
+      ) : null}
+
+      <footer className="sticky-footer">
+        <button type="button" className="btn-primary btn-block" onClick={() => setAcceptTotalOpen(true)}>
+          Accept receipt total
+        </button>
+        <p className="hint sticky-footer-hint">Enter the total from the receipt to finish shopping.</p>
+      </footer>
+
       {scannerOpen ? (
         <div className="modal-overlay">
           <BarcodeScanner onScan={onScan} onClose={() => setScannerOpen(false)} />
         </div>
+      ) : null}
+
+      {acceptTotalOpen ? (
+        <AcceptTotalModal
+          estimatedTotal={subtotal}
+          onConfirm={async (total) => {
+            await finishWithReceiptTotal(total);
+            setAcceptTotalOpen(false);
+          }}
+          onClose={() => setAcceptTotalOpen(false)}
+        />
       ) : null}
 
       {pendingScan ? (

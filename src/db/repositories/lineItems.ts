@@ -13,6 +13,7 @@ export async function addLineItem(input: {
   quantity?: number;
   unitPrice?: number;
   productId?: number | null;
+  confirmed?: boolean;
 }): Promise<LineItem & { id: number }> {
   const id = await db.lineItems.add({
     tripId: input.tripId,
@@ -21,6 +22,7 @@ export async function addLineItem(input: {
     quantity: input.quantity ?? 1,
     unitPrice: input.unitPrice ?? 0,
     productId: input.productId ?? null,
+    confirmed: input.confirmed ?? false,
   });
 
   return (await db.lineItems.get(id)) as LineItem & { id: number };
@@ -32,9 +34,28 @@ export async function updateLineItemQuantity(id: number, quantity: number): Prom
 
 export async function updateLineItem(
   id: number,
-  updates: { quantity?: number; unitPrice?: number },
+  updates: {
+    quantity?: number;
+    unitPrice?: number;
+    confirmed?: boolean;
+    productId?: number | null;
+    barcode?: string | null;
+  },
 ): Promise<void> {
   await db.lineItems.update(id, updates);
+}
+
+export async function toggleLineItemConfirmed(id: number): Promise<boolean> {
+  const item = await db.lineItems.get(id);
+  if (!item) return false;
+
+  const confirmed = !item.confirmed;
+  await db.lineItems.update(id, { confirmed });
+  return confirmed;
+}
+
+export async function setLineItemConfirmed(id: number, confirmed: boolean): Promise<void> {
+  await db.lineItems.update(id, { confirmed });
 }
 
 export async function deleteLineItem(id: number): Promise<void> {

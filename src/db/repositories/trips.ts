@@ -1,23 +1,80 @@
 import { db } from '@/db/database';
-import type { ShoppingTrip, TripWithTotal } from '@/db/schema';
+import {
+  computeTripDisplayTotal,
+  sumConfirmedLineItems,
+  sumLineItems,
+  type ShoppingTrip,
+  type TripStatus,
+  type TripWithTotal,
+} from '@/db/schema';
+
+type TripRecord = ShoppingTrip & { id: number };
+
+async function getTripItems(tripId: number) {
+  return db.lineItems.where('tripId').equals(tripId).toArray();
+}
+
+export async function createPlanningTrip(): Promise<TripRecord> {
+  const existing = await getActiveTripByStatus('planning');
+  if (existing) return existing;
+
+  const id = await db.shoppingTrips.add({
+    date: new Date().toISOString(),
+    storeName: null,
+    notes: null,
+    status: 'planning',
+    receiptTotal: null,
+  });
+
+  return (await db.shoppingTrips.get(id)) as TripRecord;
+}
 
 export async function createTrip(input: {
   storeName?: string | null;
   notes?: string | null;
-} = {}): Promise<ShoppingTrip & { id: number }> {
+  status?: TripStatus;
+} = {}): Promise<TripRecord> {
   const id = await db.shoppingTrips.add({
     date: new Date().toISOString(),
     storeName: input.storeName ?? null,
     notes: input.notes ?? null,
+    status: input.status ?? 'shopping',
+    receiptTotal: null,
   });
 
-  return (await db.shoppingTrips.get(id)) as ShoppingTrip & { id: number };
+  return (await db.shoppingTrips.get(id)) as TripRecord;
 }
 
-export async function getTrip(id: number): Promise<(ShoppingTrip & { id: number }) | undefined> {
+export async function getTrip(id: number): Promise<TripRecord | undefined> {
   const trip = await db.shoppingTrips.get(id);
   if (!trip || trip.id == null) return undefined;
-  return trip as ShoppingTrip & { id: number };
+  return trip as TripRecord;
+}
+
+export async function getActiveTripByStatus(status: TripStatus): Promise<TripRecord | undefined> {
+  const trip = await db.shoppingTrips.where('status').equals(status).first();
+  if (!trip || trip.id == null) return undefined;
+  return trip as TripRecord;
+}
+
+export async function startShopping(tripId: number): Promise<void> {
+  const shopping = await getActiveTripByStatus('shopping');
+  if (shopping && shopping.id !== tripId) {
+    throw new Error('Another shopping trip is already active.');
+  }
+
+  await db.shoppingTrips.update(tripId, { status: 'shopping' });
+}
+
+export async function acceptReceiptTotal(tripId: number, total: number): Promise<void> {
+  await db.shoppingTrips.update(tripId, {
+    receiptTotal: total,
+    status: 'pending_review',
+  });
+}
+
+export async function completeTrip(tripId: number): Promise<void> {
+  await db.shoppingTrips.update(tripId, { status: 'complete' });
 }
 
 export async function listTripsWithTotals(): Promise<TripWithTotal[]> {
@@ -25,8 +82,8 @@ export async function listTripsWithTotals(): Promise<TripWithTotal[]> {
 
   return Promise.all(
     trips.map(async (trip) => {
-      const items = await db.lineItems.where('tripId').equals(trip.id!).toArray();
-      const subtotal = items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
+      const items = await getTripItems(trip.id!);
+      const subtotal = computeTripDisplayTotal(trip, items);
 
       return {
         ...trip,
@@ -45,21 +102,19 @@ export async function getSpendingSummary(): Promise<{ weekTotal: number; monthTo
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
   const trips = await db.shoppingTrips.toArray();
-  const tripMap = new Map(trips.map((t) => [t.id!, t.date]));
-  const items = await db.lineItems.toArray();
 
   let weekTotal = 0;
   let monthTotal = 0;
 
-  for (const item of items) {
-    const tripDate = tripMap.get(item.tripId);
-    if (!tripDate) continue;
+  for (const trip of trips) {
+    if (trip.id == null) continue;
 
-    const total = item.quantity * item.unitPrice;
-    const date = new Date(tripDate);
+    const date = new Date(trip.date);
+    const items = await getTripItems(trip.id);
+    const amount = computeTripDisplayTotal(trip, items);
 
-    if (date >= weekStart) weekTotal += total;
-    if (date >= monthStart) monthTotal += total;
+    if (date >= weekStart) weekTotal += amount;
+    if (date >= monthStart) monthTotal += amount;
   }
 
   return { weekTotal, monthTotal };
@@ -69,3 +124,5 @@ export async function deleteTrip(id: number): Promise<void> {
   await db.lineItems.where('tripId').equals(id).delete();
   await db.shoppingTrips.delete(id);
 }
+
+export { sumLineItems, sumConfirmedLineItems, computeTripDisplayTotal };
