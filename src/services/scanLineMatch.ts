@@ -28,7 +28,10 @@ export function findLineItemForScanLink(
   product: { id: string; name: string; barcode: string },
 ): LineItem | undefined {
   const byBarcode = items.find(
-    (item) => item.barcode === product.barcode && lineCanAcceptProductLink(item, product),
+    (item) =>
+      item.barcode === product.barcode &&
+      lineCanAcceptProductLink(item, product) &&
+      catalogNameMatchesLine(item.productName, product.name),
   );
   if (byBarcode) return byBarcode;
 

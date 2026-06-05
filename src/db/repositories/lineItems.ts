@@ -1,11 +1,29 @@
 import { db } from '@/db/database';
 import type { LineItem } from '@/db/schema';
 import { newId, nowIso } from '@/db/schema';
+import { getProduct } from '@/db/repositories/products';
+import { catalogNameMatchesLine } from '@/services/scanLineMatch';
 import { syncRecord } from '@/sync/syncAfterWrite';
+
+async function repairCatalogLinkIfMismatch(item: LineItem): Promise<LineItem> {
+  if (!item.productId) return item;
+
+  const product = await getProduct(item.productId);
+  if (product && catalogNameMatchesLine(item.productName, product.name)) {
+    return item;
+  }
+
+  const timestamp = nowIso();
+  const patch = { productId: null, barcode: null, updatedAt: timestamp };
+  await db.lineItems.update(item.id, patch);
+  const updated = { ...item, ...patch };
+  await syncRecord('line_items', updated);
+  return updated;
+}
 
 export async function listLineItemsForTrip(tripId: string): Promise<LineItem[]> {
   const items = await db.lineItems.where('tripId').equals(tripId).sortBy('updatedAt');
-  return items;
+  return Promise.all(items.map(repairCatalogLinkIfMismatch));
 }
 
 export async function addLineItem(input: {

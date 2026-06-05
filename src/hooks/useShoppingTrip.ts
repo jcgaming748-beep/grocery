@@ -11,7 +11,11 @@ import { acceptReceiptTotal, getActiveTripByStatus } from '@/db/repositories/tri
 import type { LineItem, PendingScan } from '@/db/schema';
 import { sumLineItems } from '@/db/schema';
 import { lookupBarcodeOnline } from '@/services/barcodeLookup';
-import { findLineItemForScanLink, lineCanAcceptProductLink } from '@/services/scanLineMatch';
+import {
+  catalogNameMatchesLine,
+  findLineItemForScanLink,
+  lineCanAcceptProductLink,
+} from '@/services/scanLineMatch';
 import { fuzzyMatchProductName, parseTextCommand } from '@/services/textCommandParser';
 import { useRefreshOnSync } from '@/hooks/useSyncStatus';
 
@@ -114,7 +118,8 @@ export function useShoppingTrip() {
 
       if (
         matchedLine?.id &&
-        lineCanAcceptProductLink(matchedLine, { id: product.id, barcode: input.barcode })
+        lineCanAcceptProductLink(matchedLine, { id: product.id, barcode: input.barcode }) &&
+        catalogNameMatchesLine(matchedLine.productName, product.name)
       ) {
         await updateLineItem(matchedLine.id, {
           quantity: matchedLine.quantity + input.quantity,
