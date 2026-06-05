@@ -53,6 +53,7 @@ export async function updateLineItem(
     confirmed?: boolean;
     productId?: string | null;
     barcode?: string | null;
+    productName?: string;
   },
 ): Promise<void> {
   const timestamp = nowIso();

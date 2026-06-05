@@ -1,9 +1,6 @@
-import { useEffect, useState } from 'react';
-
-import { getProduct } from '@/db/repositories/products';
-import { blobToObjectUrl } from '@/services/imageCompression';
 import type { LineItem } from '@/db/schema';
 import { lineItemTotal } from '@/db/schema';
+import { useProductThumbnail } from '@/hooks/useProductThumbnail';
 
 type Props = {
   item: LineItem;
@@ -12,29 +9,7 @@ type Props = {
 };
 
 export default function ReviewLineItemRow({ item, onToggleConfirm, onEdit }: Props) {
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
-
-  useEffect(() => {
-    let objectUrl: string | null = null;
-    let cancelled = false;
-
-    async function loadImage() {
-      if (!item.productId) return;
-
-      const product = await getProduct(item.productId);
-      if (cancelled || !product?.imageBlob) return;
-
-      objectUrl = blobToObjectUrl(product.imageBlob);
-      if (!cancelled) setImageUrl(objectUrl);
-    }
-
-    loadImage();
-
-    return () => {
-      cancelled = true;
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-    };
-  }, [item.productId]);
+  const imageUrl = useProductThumbnail(item.productId);
 
   return (
     <div className={`review-line-item${item.confirmed ? ' review-line-item-confirmed' : ''}`}>

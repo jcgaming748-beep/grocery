@@ -11,6 +11,7 @@ import { acceptReceiptTotal, getActiveTripByStatus } from '@/db/repositories/tri
 import type { LineItem, PendingScan } from '@/db/schema';
 import { sumLineItems } from '@/db/schema';
 import { lookupBarcodeOnline } from '@/services/barcodeLookup';
+import { findLineItemForScanLink } from '@/services/scanLineMatch';
 import { fuzzyMatchProductName, parseTextCommand } from '@/services/textCommandParser';
 import { useRefreshOnSync } from '@/hooks/useSyncStatus';
 
@@ -105,18 +106,19 @@ export function useShoppingTrip() {
         imageBlob: input.imageChanged ? input.imageBlob : undefined,
       });
 
-      const matchedLine = items.find(
-        (item) =>
-          item.productId === product.id ||
-          fuzzyMatchProductName(product.name, [item.productName]) === item.productName,
-      );
+      const matchedLine = findLineItemForScanLink(items, {
+        id: product.id,
+        name: product.name,
+        barcode: input.barcode,
+      });
 
       if (matchedLine?.id) {
         await updateLineItem(matchedLine.id, {
           quantity: matchedLine.quantity + input.quantity,
           unitPrice: input.unitPrice,
-          productId: product.id ?? null,
+          productId: product.id,
           barcode: input.barcode,
+          productName: product.name,
         });
       } else {
         await addLineItem({
