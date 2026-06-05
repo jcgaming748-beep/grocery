@@ -1,5 +1,5 @@
 import { isSupabaseConfigured } from '@/lib/supabase';
-import { formatSyncError } from '@/lib/syncError';
+import { ensureAuthenticatedSession, formatSyncError, verifyDatabaseReachable } from '@/lib/syncError';
 import { pullChanges } from '@/sync/pullChanges';
 import { pushChanges } from '@/sync/pushChanges';
 
@@ -54,6 +54,8 @@ async function runSync(): Promise<void> {
   syncInFlight = (async () => {
     setStatus('syncing');
     try {
+      await ensureAuthenticatedSession(currentUserId!);
+      await verifyDatabaseReachable();
       await pushChanges(currentUserId!);
       await pullChanges(currentUserId!);
       setStatus(navigator.onLine ? 'synced' : 'offline');

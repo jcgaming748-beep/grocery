@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
 import SpendingSummaryCard from '@/components/SpendingSummaryCard';
+import SyncErrorBanner from '@/components/SyncErrorBanner';
 import SyncStatusBadge from '@/components/SyncStatusBadge';
 import { useAuth } from '@/contexts/AuthContext';
 import {
@@ -65,6 +66,8 @@ export default function HomePage() {
           </button>
         </div>
       </header>
+
+      <SyncErrorBanner />
 
       <SpendingSummaryCard weekTotal={summary.weekTotal} monthTotal={summary.monthTotal} />
 

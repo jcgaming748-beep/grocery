@@ -1,6 +1,11 @@
 import { db } from '@/db/database';
 import type { OutboxEntry, SyncEntity } from '@/db/schema';
 import { PRODUCT_IMAGES_BUCKET, requireSupabase } from '@/lib/supabase';
+import {
+  ensureAuthenticatedSession,
+  formatSyncError,
+  refreshOutboxPayload,
+} from '@/lib/syncError';
 import type { RemoteLineItem, RemoteProduct, RemoteShoppingTrip } from '@/lib/supabaseTypes';
 import { uploadProductImageIfNeeded } from '@/sync/imageSync';
 import { incrementOutboxRetry, listOutboxEntries, removeOutboxEntry } from '@/sync/outbox';
@@ -22,26 +27,40 @@ function sortOutboxEntries(entries: OutboxEntry[]): OutboxEntry[] {
   return [...upserts, ...deletes];
 }
 
+function wrapSyncError(entity: SyncEntity, entityId: string, error: unknown): Error {
+  const detail = formatSyncError(error);
+  return new Error(`${entity} ${entityId.slice(0, 8)}…: ${detail}`);
+}
+
 export async function pushChanges(userId: string): Promise<void> {
   const client = requireSupabase();
+  await ensureAuthenticatedSession(userId);
+
   const entries = sortOutboxEntries(await listOutboxEntries());
 
   for (const entry of entries) {
     try {
       if (entry.operation === 'delete') {
         const { error } = await client.from(entry.entity).delete().eq('id', entry.entityId);
-        if (error) throw error;
+        if (error) throw wrapSyncError(entry.entity, entry.entityId, error);
         await removeOutboxEntry(entry.localId!);
         continue;
       }
 
-      const { error } = await client.from(entry.entity).upsert(entry.payload);
-      if (error) throw error;
+      const payload =
+        (await refreshOutboxPayload(entry.entity, entry.entityId, userId)) ?? entry.payload;
+
+      const { error } = await client.from(entry.entity).upsert(payload, { onConflict: 'id' });
+      if (error) throw wrapSyncError(entry.entity, entry.entityId, error);
 
       if (entry.entity === 'products' && entry.pendingImageUpload) {
         const product = await db.products.get(entry.entityId);
-        if (product) {
-          await uploadProductImageIfNeeded(product, userId);
+        if (product?.imageBlob) {
+          try {
+            await uploadProductImageIfNeeded(product, userId);
+          } catch (imageError) {
+            console.warn('Product photo upload failed (will retry later):', imageError);
+          }
         }
       }
 
@@ -70,14 +89,16 @@ export async function cloudHasAnyData(userId: string): Promise<boolean> {
     client.from('shopping_trips').select('id').eq('user_id', userId).limit(1),
   ]);
 
-  if (products.error) throw products.error;
-  if (trips.error) throw trips.error;
+  if (products.error) throw new Error(formatSyncError(products.error));
+  if (trips.error) throw new Error(formatSyncError(trips.error));
 
   return (products.data?.length ?? 0) > 0 || (trips.data?.length ?? 0) > 0;
 }
 
 export async function bulkUploadAll(userId: string): Promise<void> {
   const client = requireSupabase();
+  await ensureAuthenticatedSession(userId);
+
   const [products, trips, lineItems] = await Promise.all([
     db.products.toArray(),
     db.shoppingTrips.toArray(),
@@ -96,12 +117,16 @@ export async function bulkUploadAll(userId: string): Promise<void> {
       image_path: product.imagePath,
       updated_at: product.updatedAt,
     }));
-    const { error } = await client.from('products').upsert(rows);
+    const { error } = await client.from('products').upsert(rows, { onConflict: 'id' });
     if (error) throw error;
 
     for (const product of products) {
       if (product.imageBlob && !product.imagePath) {
-        await uploadProductImageIfNeeded(product, userId);
+        try {
+          await uploadProductImageIfNeeded(product, userId);
+        } catch (imageError) {
+          console.warn('Product photo upload failed during backup:', imageError);
+        }
       }
     }
   }
@@ -117,7 +142,7 @@ export async function bulkUploadAll(userId: string): Promise<void> {
       receipt_total: trip.receiptTotal,
       updated_at: trip.updatedAt,
     }));
-    const { error } = await client.from('shopping_trips').upsert(rows);
+    const { error } = await client.from('shopping_trips').upsert(rows, { onConflict: 'id' });
     if (error) throw error;
   }
 
@@ -134,7 +159,7 @@ export async function bulkUploadAll(userId: string): Promise<void> {
       confirmed: item.confirmed,
       updated_at: item.updatedAt,
     }));
-    const { error } = await client.from('line_items').upsert(rows);
+    const { error } = await client.from('line_items').upsert(rows, { onConflict: 'id' });
     if (error) throw error;
   }
 

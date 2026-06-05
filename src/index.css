@@ -351,6 +351,25 @@ input {
   padding: 0;
 }
 
+.sync-error-banner {
+  margin-bottom: 16px;
+  padding: 12px;
+  border-radius: 10px;
+  background: #fee2e2;
+  border: 1px solid #fecaca;
+}
+
+.sync-error-banner-text {
+  margin: 0 0 10px;
+  font-size: 0.875rem;
+  line-height: 1.4;
+  color: #991b1b;
+}
+
+.sync-error-banner-btn {
+  width: 100%;
+}
+
 .login-page {
   min-height: calc(100dvh - 32px);
   display: flex;
