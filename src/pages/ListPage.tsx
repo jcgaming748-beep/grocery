@@ -40,38 +40,40 @@ export default function ListPage() {
 
   return (
     <div className="page page-with-footer">
-      <header className="page-header">
-        <h1>Grocery list</h1>
-      </header>
+      <div className="page-body">
+        <header className="page-header">
+          <h1>Grocery list</h1>
+        </header>
 
-      {statusMessage ? (
-        <button type="button" className="status-banner" onClick={clearStatusMessage}>
-          {statusMessage}
-        </button>
-      ) : null}
+        {statusMessage ? (
+          <button type="button" className="status-banner" onClick={clearStatusMessage}>
+            {statusMessage}
+          </button>
+        ) : null}
 
-      <ProductAutocompleteInput
-        onSelectProduct={(product) => addFromProduct(product)}
-        onAddFreeText={(name) => addFreeText(name)}
-      />
+        <ProductAutocompleteInput
+          onSelectProduct={(product) => addFromProduct(product)}
+          onAddFreeText={(name) => addFreeText(name)}
+        />
 
-      <section className="item-list">
-        {items.length === 0 ? (
-          <p className="empty">Add items to your list.</p>
-        ) : (
-          items.map((item) => (
-            <LineItemRow
-              key={item.id}
-              item={item}
-              onPress={() => setEditingItem(item)}
-              onDelete={async () => {
-                if (!window.confirm(`Remove ${item.productName} from the list?`)) return;
-                await removeLineItem(item.id);
-              }}
-            />
-          ))
-        )}
-      </section>
+        <section className="item-list">
+          {items.length === 0 ? (
+            <p className="empty">Add items to your list.</p>
+          ) : (
+            items.map((item) => (
+              <LineItemRow
+                key={item.id}
+                item={item}
+                onPress={() => setEditingItem(item)}
+                onDelete={async () => {
+                  if (!window.confirm(`Remove ${item.productName} from the list?`)) return;
+                  await removeLineItem(item.id);
+                }}
+              />
+            ))
+          )}
+        </section>
+      </div>
 
       <footer className="sticky-footer">
         <div className="sticky-footer-summary">

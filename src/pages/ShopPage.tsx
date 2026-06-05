@@ -119,86 +119,88 @@ export default function ShopPage() {
 
   return (
     <div className="page page-with-footer">
-      <header className="page-header">
-        <h1>Shopping</h1>
-      </header>
+      <div className="page-body">
+        <header className="page-header">
+          <h1>Shopping</h1>
+        </header>
 
-      <div className="trip-total-banner">
-        <span className="trip-total-label">Estimated total</span>
-        <span className="trip-total-amount">${subtotal.toFixed(2)}</span>
-      </div>
+        <div className="trip-total-banner">
+          <span className="trip-total-label">Estimated total</span>
+          <span className="trip-total-amount">${subtotal.toFixed(2)}</span>
+        </div>
 
-      {statusMessage ? (
-        <button type="button" className="status-banner" onClick={clearStatusMessage}>
-          {statusMessage}
+        {statusMessage ? (
+          <button type="button" className="status-banner" onClick={clearStatusMessage}>
+            {statusMessage}
+          </button>
+        ) : null}
+
+        <section className="item-list">
+          {items.length === 0 ? (
+            <p className="empty">Your list is empty. You can still enter the receipt total below.</p>
+          ) : (
+            items.map((item) => (
+              <LineItemRow
+                key={item.id}
+                item={item}
+                onPress={() => setEditingItem(item)}
+                onDelete={async () => {
+                  if (!window.confirm(`Remove ${item.productName} from this trip?`)) return;
+                  await removeLineItem(item.id);
+                }}
+              />
+            ))
+          )}
+        </section>
+
+        <button
+          type="button"
+          className="btn-link advanced-toggle"
+          onClick={() => setShowAdvanced((v) => !v)}>
+          {showAdvanced ? 'Hide scan & add tools' : 'Scan barcodes or add items (optional)'}
         </button>
-      ) : null}
 
-      <section className="item-list">
-        {items.length === 0 ? (
-          <p className="empty">Your list is empty. You can still enter the receipt total below.</p>
-        ) : (
-          items.map((item) => (
-            <LineItemRow
-              key={item.id}
-              item={item}
-              onPress={() => setEditingItem(item)}
-              onDelete={async () => {
-                if (!window.confirm(`Remove ${item.productName} from this trip?`)) return;
-                await removeLineItem(item.id);
-              }}
-            />
-          ))
-        )}
-      </section>
-
-      <button
-        type="button"
-        className="btn-link advanced-toggle"
-        onClick={() => setShowAdvanced((v) => !v)}>
-        {showAdvanced ? 'Hide scan & add tools' : 'Scan barcodes or add items (optional)'}
-      </button>
-
-      {showAdvanced ? (
-        <div className="advanced-tools">
-          <div className="action-row">
-            <button type="button" className="btn-primary" onClick={() => setScannerOpen(true)}>
-              Scan barcode
-            </button>
-          </div>
-
-          <TextCommandInput onSubmit={handleTextCommand} />
-
-          <form className="manual-form" onSubmit={submitManualItem}>
-            <h2 className="section-title">Manual add</h2>
-            <input
-              className="input"
-              placeholder="Product name"
-              value={itemName}
-              onChange={(e) => setItemName(e.target.value)}
-            />
-            <div className="manual-form-row">
-              <input
-                className="input"
-                placeholder="Qty"
-                inputMode="decimal"
-                value={itemQty}
-                onChange={(e) => setItemQty(e.target.value)}
-              />
-              <input
-                className="input"
-                placeholder="Price"
-                inputMode="decimal"
-                value={itemPrice}
-                onChange={(e) => setItemPrice(e.target.value)}
-              />
-              <button type="submit" className="btn-secondary">
-                Add
+        {showAdvanced ? (
+          <div className="advanced-tools">
+            <div className="action-row">
+              <button type="button" className="btn-primary" onClick={() => setScannerOpen(true)}>
+                Scan barcode
               </button>
             </div>
-          </form>
-        </div>
-      ) : null}
+
+            <TextCommandInput onSubmit={handleTextCommand} />
+
+            <form className="manual-form" onSubmit={submitManualItem}>
+              <h2 className="section-title">Manual add</h2>
+              <input
+                className="input"
+                placeholder="Product name"
+                value={itemName}
+                onChange={(e) => setItemName(e.target.value)}
+              />
+              <div className="manual-form-row">
+                <input
+                  className="input"
+                  placeholder="Qty"
+                  inputMode="decimal"
+                  value={itemQty}
+                  onChange={(e) => setItemQty(e.target.value)}
+                />
+                <input
+                  className="input"
+                  placeholder="Price"
+                  inputMode="decimal"
+                  value={itemPrice}
+                  onChange={(e) => setItemPrice(e.target.value)}
+                />
+                <button type="submit" className="btn-secondary">
+                  Add
+                </button>
+              </div>
+            </form>
+          </div>
+        ) : null}
+      </div>
 
       <footer className="sticky-footer">
         <button type="button" className="btn-primary btn-block" onClick={() => setAcceptTotalOpen(true)}>
