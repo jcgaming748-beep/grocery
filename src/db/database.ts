@@ -40,6 +40,80 @@ type LegacyBackup = {
   lineItems: LegacyLineItem[];
 };
 
+type LegacyMigrationTx = {
+  table: (name: string) => {
+    get: (key: string) => Promise<LegacyBackup | undefined>;
+    put: (value: unknown) => Promise<void>;
+    delete: (key: string) => Promise<void>;
+  };
+};
+
+async function migrateLegacyBackupToUuidStores(tx: LegacyMigrationTx): Promise<void> {
+  const backup = await tx.table('legacy_backup').get('v3');
+  if (!backup) return;
+
+  const timestamp = nowIso();
+  const productIdMap = new Map<number, string>();
+  const tripIdMap = new Map<number, string>();
+
+  for (const product of backup.products) {
+    const id = newId();
+    if (product.id != null) {
+      productIdMap.set(product.id, id);
+    }
+    await tx.table('products').put({
+      id,
+      barcode: product.barcode,
+      name: product.name,
+      defaultUnitPrice: product.defaultUnitPrice,
+      category: product.category,
+      lastUsedAt: product.lastUsedAt,
+      imagePath: null,
+      imageBlob: product.imageBlob ?? null,
+      updatedAt: timestamp,
+      syncedAt: null,
+    });
+  }
+
+  for (const trip of backup.trips) {
+    const id = newId();
+    if (trip.id != null) {
+      tripIdMap.set(trip.id, id);
+    }
+    await tx.table('shoppingTrips').put({
+      id,
+      date: trip.date,
+      storeName: trip.storeName,
+      notes: trip.notes,
+      status: (trip.status as ShoppingTrip['status']) ?? 'complete',
+      receiptTotal: trip.receiptTotal ?? null,
+      updatedAt: timestamp,
+      syncedAt: null,
+    });
+  }
+
+  for (const item of backup.lineItems) {
+    const tripId = tripIdMap.get(item.tripId);
+    if (!tripId) continue;
+
+    await tx.table('lineItems').put({
+      id: newId(),
+      tripId,
+      productName: item.productName,
+      barcode: item.barcode,
+      quantity: item.quantity,
+      unitPrice: item.unitPrice,
+      productId: item.productId != null ? (productIdMap.get(item.productId) ?? null) : null,
+      confirmed: item.confirmed ?? true,
+      updatedAt: timestamp,
+      syncedAt: null,
+    });
+  }
+
+  await tx.table('sync_meta').put({ key: 'legacyPendingUpload', value: 'true' });
+  await tx.table('legacy_backup').delete('v3');
+}
+
 class GroceryDatabase extends Dexie {
   products!: EntityTable<Product, 'id'>;
   shoppingTrips!: EntityTable<ShoppingTrip, 'id'>;
@@ -125,7 +199,17 @@ class GroceryDatabase extends Dexie {
         }
       });
 
-    this.version(5)
+    // Dexie cannot change ++id to string id in one step — drop old stores first.
+    this.version(5).stores({
+      products: null,
+      shoppingTrips: null,
+      lineItems: null,
+      sync_outbox: '++localId, createdAt, entityId',
+      sync_meta: 'key',
+      legacy_backup: 'key',
+    });
+
+    this.version(6)
       .stores({
         products: 'id, &barcode, lastUsedAt, updatedAt',
         shoppingTrips: 'id, date, status, updatedAt',
@@ -135,71 +219,32 @@ class GroceryDatabase extends Dexie {
         legacy_backup: 'key',
       })
       .upgrade(async (tx) => {
-        const backup = await tx.table('legacy_backup').get('v3');
-        const timestamp = nowIso();
-        const productIdMap = new Map<number, string>();
-        const tripIdMap = new Map<number, string>();
-
-        if (backup) {
-          for (const product of backup.products) {
-            const id = newId();
-            if (product.id != null) {
-              productIdMap.set(product.id, id);
-            }
-            await tx.table('products').put({
-              id,
-              barcode: product.barcode,
-              name: product.name,
-              defaultUnitPrice: product.defaultUnitPrice,
-              category: product.category,
-              lastUsedAt: product.lastUsedAt,
-              imagePath: null,
-              imageBlob: product.imageBlob ?? null,
-              updatedAt: timestamp,
-              syncedAt: null,
-            });
-          }
-
-          for (const trip of backup.trips) {
-            const id = newId();
-            if (trip.id != null) {
-              tripIdMap.set(trip.id, id);
-            }
-            await tx.table('shoppingTrips').put({
-              id,
-              date: trip.date,
-              storeName: trip.storeName,
-              notes: trip.notes,
-              status: (trip.status as ShoppingTrip['status']) ?? 'complete',
-              receiptTotal: trip.receiptTotal ?? null,
-              updatedAt: timestamp,
-              syncedAt: null,
-            });
-          }
-
-          for (const item of backup.lineItems) {
-            const tripId = tripIdMap.get(item.tripId);
-            if (!tripId) continue;
-
-            await tx.table('lineItems').put({
-              id: newId(),
-              tripId,
-              productName: item.productName,
-              barcode: item.barcode,
-              quantity: item.quantity,
-              unitPrice: item.unitPrice,
-              productId: item.productId != null ? (productIdMap.get(item.productId) ?? null) : null,
-              confirmed: item.confirmed ?? true,
-              updatedAt: timestamp,
-              syncedAt: null,
-            });
-          }
-
-          await tx.table('sync_meta').put({ key: 'legacyPendingUpload', value: 'true' });
-          await tx.table('legacy_backup').delete('v3');
-        }
+        await migrateLegacyBackupToUuidStores(tx);
       });
   }
 }
 
 export const db = new GroceryDatabase();
+
+function isUpgradeError(error: unknown): boolean {
+  if (error instanceof Dexie.UpgradeError) return true;
+  if (error instanceof Error) {
+    return error.name === 'UpgradeError' || error.message.includes('primary key');
+  }
+  return false;
+}
+
+export async function openDatabase(): Promise<void> {
+  if (db.isOpen()) return;
+
+  try {
+    await db.open();
+  } catch (error) {
+    if (!isUpgradeError(error)) {
+      throw error;
+    }
+
+    await db.delete();
+    await db.open();
+  }
+}

@@ -5,6 +5,9 @@ import { lineItemToRemote, productToRemote, tripToRemote } from '@/sync/mappers'
 
 function friendlyDbError(message: string): string | null {
   const lower = message.toLowerCase();
+  if (lower.includes('primary key') || lower.includes('upgradeerror')) {
+    return 'Local database upgrade failed. Close the app, reopen it once — your data will reload from the cloud.';
+  }
   if (
     lower.includes('schema cache') ||
     lower.includes('does not exist') ||
