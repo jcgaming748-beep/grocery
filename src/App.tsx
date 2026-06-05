@@ -1,6 +1,7 @@
 import { NavLink, Route, Routes } from 'react-router-dom';
 
 import MigrationModal from '@/components/MigrationModal';
+import SyncStatusPanel from '@/components/SyncStatusPanel';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import HomePage from '@/pages/HomePage';
 import ListPage from '@/pages/ListPage';
@@ -27,6 +28,7 @@ function AuthenticatedApp() {
   return (
     <>
       <MigrationModal />
+      <SyncStatusPanel />
       <main className="app-main">
         <Routes>
           <Route path="/" element={<HomePage />} />
