@@ -59,6 +59,15 @@ export function useTripReview(tripId: string) {
     [refresh],
   );
 
+  const unlinkLineItemFromCatalog = useCallback(
+    async (lineItemId: string) => {
+      await updateLineItem(lineItemId, { productId: null, barcode: null });
+      await refresh();
+      setStatusMessage('Catalog link removed.');
+    },
+    [refresh],
+  );
+
   const removeLineItem = useCallback(
     async (lineItemId: string) => {
       await deleteLineItem(lineItemId);
@@ -100,6 +109,7 @@ export function useTripReview(tripId: string) {
     clearStatusMessage: () => setStatusMessage(null),
     toggleConfirmed,
     updateLineItemDetails,
+    unlinkLineItemFromCatalog,
     removeLineItem,
     addManualItem,
     markComplete,

@@ -113,6 +113,17 @@ export function usePlanningList() {
     [refresh, tripId],
   );
 
+  const unlinkLineItemFromCatalog = useCallback(
+    async (lineItemId: string) => {
+      if (tripId == null) return;
+
+      await updateLineItem(lineItemId, { productId: null, barcode: null });
+      await refresh(tripId);
+      setStatusMessage('Catalog link removed.');
+    },
+    [refresh, tripId],
+  );
+
   const removeLineItem = useCallback(
     async (lineItemId: string) => {
       if (tripId == null) return;
@@ -143,6 +154,7 @@ export function usePlanningList() {
     addFromProduct,
     addFreeText,
     updateLineItemDetails,
+    unlinkLineItemFromCatalog,
     removeLineItem,
     beginShopping,
   };

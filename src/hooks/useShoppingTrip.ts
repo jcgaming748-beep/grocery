@@ -11,7 +11,7 @@ import { acceptReceiptTotal, getActiveTripByStatus } from '@/db/repositories/tri
 import type { LineItem, PendingScan } from '@/db/schema';
 import { sumLineItems } from '@/db/schema';
 import { lookupBarcodeOnline } from '@/services/barcodeLookup';
-import { findLineItemForScanLink } from '@/services/scanLineMatch';
+import { findLineItemForScanLink, lineCanAcceptProductLink } from '@/services/scanLineMatch';
 import { fuzzyMatchProductName, parseTextCommand } from '@/services/textCommandParser';
 import { useRefreshOnSync } from '@/hooks/useSyncStatus';
 
@@ -112,7 +112,10 @@ export function useShoppingTrip() {
         barcode: input.barcode,
       });
 
-      if (matchedLine?.id) {
+      if (
+        matchedLine?.id &&
+        lineCanAcceptProductLink(matchedLine, { id: product.id, barcode: input.barcode })
+      ) {
         await updateLineItem(matchedLine.id, {
           quantity: matchedLine.quantity + input.quantity,
           unitPrice: input.unitPrice,
@@ -180,6 +183,17 @@ export function useShoppingTrip() {
       }
       await refreshItems(tripId);
       setStatusMessage('Item updated.');
+    },
+    [refreshItems, tripId],
+  );
+
+  const unlinkLineItemFromCatalog = useCallback(
+    async (lineItemId: string) => {
+      if (tripId == null) return;
+
+      await updateLineItem(lineItemId, { productId: null, barcode: null });
+      await refreshItems(tripId);
+      setStatusMessage('Catalog link removed. Re-scan to attach the correct product.');
     },
     [refreshItems, tripId],
   );
@@ -279,6 +293,7 @@ export function useShoppingTrip() {
     confirmScanAdd,
     saveManualProduct,
     updateLineItemDetails,
+    unlinkLineItemFromCatalog,
     removeLineItem,
     handleTextCommand,
     addManualItem,

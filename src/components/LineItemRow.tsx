@@ -9,7 +9,7 @@ type Props = {
 };
 
 export default function LineItemRow({ item, onPress, onDelete }: Props) {
-  const imageUrl = useProductThumbnail(item.productId);
+  const imageUrl = useProductThumbnail(item.productId, item.productName);
   const isZeroPrice = item.unitPrice === 0;
 
   const main = (

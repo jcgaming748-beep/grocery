@@ -6,10 +6,17 @@ type Props = {
   item: LineItem;
   onSave: (updates: { quantity: number; unitPrice: number }) => void;
   onDelete: () => void;
+  onUnlinkCatalog?: () => void;
   onClose: () => void;
 };
 
-export default function EditLineItemModal({ item, onSave, onDelete, onClose }: Props) {
+export default function EditLineItemModal({
+  item,
+  onSave,
+  onDelete,
+  onUnlinkCatalog,
+  onClose,
+}: Props) {
   const [quantity, setQuantity] = useState(String(item.quantity));
   const [unitPrice, setUnitPrice] = useState(
     item.unitPrice === 0 ? '' : String(item.unitPrice),
@@ -57,6 +64,11 @@ export default function EditLineItemModal({ item, onSave, onDelete, onClose }: P
         <button type="button" className="btn-primary btn-block" onClick={handleSave}>
           Save
         </button>
+        {item.productId && onUnlinkCatalog ? (
+          <button type="button" className="btn-secondary btn-block" onClick={onUnlinkCatalog}>
+            Wrong photo? Unlink from catalog
+          </button>
+        ) : null}
         <button type="button" className="btn-danger btn-block" onClick={onDelete}>
           Remove item
         </button>

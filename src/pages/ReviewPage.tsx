@@ -20,6 +20,7 @@ export default function ReviewPage() {
     clearStatusMessage,
     toggleConfirmed,
     updateLineItemDetails,
+    unlinkLineItemFromCatalog,
     removeLineItem,
     addManualItem,
     markComplete,
@@ -159,6 +160,10 @@ export default function ReviewPage() {
           }}
           onDelete={async () => {
             await removeLineItem(editingItem.id);
+            setEditingItem(null);
+          }}
+          onUnlinkCatalog={async () => {
+            await unlinkLineItemFromCatalog(editingItem.id);
             setEditingItem(null);
           }}
           onClose={() => setEditingItem(null)}

@@ -9,7 +9,7 @@ type Props = {
 };
 
 export default function ReviewLineItemRow({ item, onToggleConfirm, onEdit }: Props) {
-  const imageUrl = useProductThumbnail(item.productId);
+  const imageUrl = useProductThumbnail(item.productId, item.productName);
 
   return (
     <div className={`review-line-item${item.confirmed ? ' review-line-item-confirmed' : ''}`}>

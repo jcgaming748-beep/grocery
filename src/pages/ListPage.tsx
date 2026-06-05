@@ -18,6 +18,7 @@ export default function ListPage() {
     addFromProduct,
     addFreeText,
     updateLineItemDetails,
+    unlinkLineItemFromCatalog,
     removeLineItem,
     beginShopping,
   } = usePlanningList();
@@ -101,6 +102,10 @@ export default function ListPage() {
           }}
           onDelete={async () => {
             await removeLineItem(editingItem.id);
+            setEditingItem(null);
+          }}
+          onUnlinkCatalog={async () => {
+            await unlinkLineItemFromCatalog(editingItem.id);
             setEditingItem(null);
           }}
           onClose={() => setEditingItem(null)}

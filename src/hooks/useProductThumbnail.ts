@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 
 import { getProduct } from '@/db/repositories/products';
+import { catalogNameMatchesLine } from '@/services/scanLineMatch';
 import { blobToObjectUrl } from '@/services/imageCompression';
 
-export function useProductThumbnail(productId: string | null): string | null {
+export function useProductThumbnail(productId: string | null, lineName: string): string | null {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
 
   useEffect(() => {
@@ -18,7 +19,7 @@ export function useProductThumbnail(productId: string | null): string | null {
       const product = await getProduct(productId);
       if (cancelled) return;
 
-      if (!product?.imageBlob) {
+      if (!product?.imageBlob || !catalogNameMatchesLine(lineName, product.name)) {
         setImageUrl(null);
         return;
       }
@@ -37,7 +38,7 @@ export function useProductThumbnail(productId: string | null): string | null {
         URL.revokeObjectURL(objectUrl);
       }
     };
-  }, [productId]);
+  }, [productId, lineName]);
 
   return imageUrl;
 }

@@ -22,6 +22,7 @@ export default function ShopPage() {
     confirmScanAdd,
     saveManualProduct,
     updateLineItemDetails,
+    unlinkLineItemFromCatalog,
     removeLineItem,
     handleTextCommand,
     addManualItem,
@@ -316,6 +317,10 @@ export default function ShopPage() {
           }}
           onDelete={async () => {
             await removeLineItem(editingItem.id);
+            setEditingItem(null);
+          }}
+          onUnlinkCatalog={async () => {
+            await unlinkLineItemFromCatalog(editingItem.id);
             setEditingItem(null);
           }}
           onClose={() => setEditingItem(null)}
