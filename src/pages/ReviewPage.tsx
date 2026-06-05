@@ -8,7 +8,7 @@ import { useTripReview } from '@/hooks/useTripReview';
 export default function ReviewPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const tripId = Number(id);
+  const tripId = id ?? '';
 
   const {
     trip,

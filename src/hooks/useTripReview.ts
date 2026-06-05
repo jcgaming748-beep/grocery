@@ -12,9 +12,9 @@ import { completeTrip, getTrip } from '@/db/repositories/trips';
 import type { LineItem, ShoppingTrip } from '@/db/schema';
 import { sumConfirmedLineItems, sumLineItems } from '@/db/schema';
 
-export function useTripReview(tripId: number) {
-  const [trip, setTrip] = useState<(ShoppingTrip & { id: number }) | null>(null);
-  const [items, setItems] = useState<(LineItem & { id: number })[]>([]);
+export function useTripReview(tripId: string) {
+  const [trip, setTrip] = useState<ShoppingTrip | null>(null);
+  const [items, setItems] = useState<LineItem[]>([]);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
@@ -36,7 +36,7 @@ export function useTripReview(tripId: number) {
     receiptTotal != null ? Math.round((receiptTotal - confirmedTotal) * 100) / 100 : null;
 
   const toggleConfirmed = useCallback(
-    async (lineItemId: number) => {
+    async (lineItemId: string) => {
       await toggleLineItemConfirmed(lineItemId);
       await refresh();
     },
@@ -45,9 +45,9 @@ export function useTripReview(tripId: number) {
 
   const updateLineItemDetails = useCallback(
     async (
-      lineItemId: number,
+      lineItemId: string,
       updates: { quantity: number; unitPrice: number },
-      productId: number | null,
+      productId: string | null,
     ) => {
       await updateLineItem(lineItemId, updates);
       if (productId != null) {
@@ -60,7 +60,7 @@ export function useTripReview(tripId: number) {
   );
 
   const removeLineItem = useCallback(
-    async (lineItemId: number) => {
+    async (lineItemId: string) => {
       await deleteLineItem(lineItemId);
       await refresh();
       setStatusMessage('Item removed.');

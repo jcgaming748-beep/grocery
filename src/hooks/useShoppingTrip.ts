@@ -12,13 +12,14 @@ import type { LineItem, PendingScan } from '@/db/schema';
 import { sumLineItems } from '@/db/schema';
 import { lookupBarcodeOnline } from '@/services/barcodeLookup';
 import { fuzzyMatchProductName, parseTextCommand } from '@/services/textCommandParser';
+import { useRefreshOnSync } from '@/hooks/useSyncStatus';
 
 export function useShoppingTrip() {
-  const [tripId, setTripId] = useState<number | null>(null);
-  const [items, setItems] = useState<(LineItem & { id: number })[]>([]);
+  const [tripId, setTripId] = useState<string | null>(null);
+  const [items, setItems] = useState<LineItem[]>([]);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
-  const refreshItems = useCallback(async (id: number) => {
+  const refreshItems = useCallback(async (id: string) => {
     setItems(await listLineItemsForTrip(id));
   }, []);
 
@@ -38,9 +39,13 @@ export function useShoppingTrip() {
     loadShoppingTrip();
   }, [loadShoppingTrip]);
 
+  useRefreshOnSync(useCallback(async () => {
+    await loadShoppingTrip();
+  }, [loadShoppingTrip]));
+
   const subtotal = useMemo(() => sumLineItems(items), [items]);
 
-  const ensureTrip = useCallback(async (): Promise<number> => {
+  const ensureTrip = useCallback(async (): Promise<string> => {
     if (tripId != null) return tripId;
     throw new Error('No active shopping trip. Start shopping from the List tab.');
   }, [tripId]);
@@ -161,9 +166,9 @@ export function useShoppingTrip() {
 
   const updateLineItemDetails = useCallback(
     async (
-      lineItemId: number,
+      lineItemId: string,
       updates: { quantity: number; unitPrice: number },
-      productId: number | null,
+      productId: string | null,
     ) => {
       if (tripId == null) return;
 
@@ -178,7 +183,7 @@ export function useShoppingTrip() {
   );
 
   const removeLineItem = useCallback(
-    async (lineItemId: number) => {
+    async (lineItemId: string) => {
       if (tripId == null) return;
 
       await deleteLineItem(lineItemId);

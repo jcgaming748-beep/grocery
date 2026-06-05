@@ -14,13 +14,14 @@ import {
 } from '@/db/repositories/trips';
 import type { LineItem, Product } from '@/db/schema';
 import { sumLineItems } from '@/db/schema';
+import { useRefreshOnSync } from '@/hooks/useSyncStatus';
 
 export function usePlanningList() {
-  const [tripId, setTripId] = useState<number | null>(null);
-  const [items, setItems] = useState<(LineItem & { id: number })[]>([]);
+  const [tripId, setTripId] = useState<string | null>(null);
+  const [items, setItems] = useState<LineItem[]>([]);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
-  const refresh = useCallback(async (id: number) => {
+  const refresh = useCallback(async (id: string) => {
     setItems(await listLineItemsForTrip(id));
   }, []);
 
@@ -39,6 +40,16 @@ export function usePlanningList() {
   useEffect(() => {
     loadPlanningTrip();
   }, [loadPlanningTrip]);
+
+  useRefreshOnSync(
+    useCallback(async () => {
+      if (tripId) {
+        await refresh(tripId);
+      } else {
+        await loadPlanningTrip();
+      }
+    }, [tripId, refresh, loadPlanningTrip]),
+  );
 
   const subtotal = useMemo(() => sumLineItems(items), [items]);
 
@@ -86,9 +97,9 @@ export function usePlanningList() {
 
   const updateLineItemDetails = useCallback(
     async (
-      lineItemId: number,
+      lineItemId: string,
       updates: { quantity: number; unitPrice: number },
-      productId: number | null,
+      productId: string | null,
     ) => {
       if (tripId == null) return;
 
@@ -103,7 +114,7 @@ export function usePlanningList() {
   );
 
   const removeLineItem = useCallback(
-    async (lineItemId: number) => {
+    async (lineItemId: string) => {
       if (tripId == null) return;
 
       await deleteLineItem(lineItemId);

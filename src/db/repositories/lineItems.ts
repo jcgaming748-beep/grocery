@@ -1,21 +1,25 @@
 import { db } from '@/db/database';
 import type { LineItem } from '@/db/schema';
+import { newId, nowIso } from '@/db/schema';
+import { syncRecord } from '@/sync/syncAfterWrite';
 
-export async function listLineItemsForTrip(tripId: number): Promise<(LineItem & { id: number })[]> {
-  const items = await db.lineItems.where('tripId').equals(tripId).sortBy('id');
-  return items as (LineItem & { id: number })[];
+export async function listLineItemsForTrip(tripId: string): Promise<LineItem[]> {
+  const items = await db.lineItems.where('tripId').equals(tripId).sortBy('updatedAt');
+  return items;
 }
 
 export async function addLineItem(input: {
-  tripId: number;
+  tripId: string;
   productName: string;
   barcode?: string | null;
   quantity?: number;
   unitPrice?: number;
-  productId?: number | null;
+  productId?: string | null;
   confirmed?: boolean;
-}): Promise<LineItem & { id: number }> {
-  const id = await db.lineItems.add({
+}): Promise<LineItem> {
+  const timestamp = nowIso();
+  const item: LineItem = {
+    id: newId(),
     tripId: input.tripId,
     productName: input.productName,
     barcode: input.barcode ?? null,
@@ -23,46 +27,72 @@ export async function addLineItem(input: {
     unitPrice: input.unitPrice ?? 0,
     productId: input.productId ?? null,
     confirmed: input.confirmed ?? false,
-  });
+    updatedAt: timestamp,
+    syncedAt: null,
+  };
 
-  return (await db.lineItems.get(id)) as LineItem & { id: number };
+  await db.lineItems.put(item);
+  await syncRecord('line_items', item);
+  return item;
 }
 
-export async function updateLineItemQuantity(id: number, quantity: number): Promise<void> {
-  await db.lineItems.update(id, { quantity });
+export async function updateLineItemQuantity(id: string, quantity: number): Promise<void> {
+  const timestamp = nowIso();
+  await db.lineItems.update(id, { quantity, updatedAt: timestamp });
+  const item = await db.lineItems.get(id);
+  if (item) {
+    await syncRecord('line_items', item);
+  }
 }
 
 export async function updateLineItem(
-  id: number,
+  id: string,
   updates: {
     quantity?: number;
     unitPrice?: number;
     confirmed?: boolean;
-    productId?: number | null;
+    productId?: string | null;
     barcode?: string | null;
   },
 ): Promise<void> {
-  await db.lineItems.update(id, updates);
+  const timestamp = nowIso();
+  await db.lineItems.update(id, { ...updates, updatedAt: timestamp });
+  const item = await db.lineItems.get(id);
+  if (item) {
+    await syncRecord('line_items', item);
+  }
 }
 
-export async function toggleLineItemConfirmed(id: number): Promise<boolean> {
+export async function toggleLineItemConfirmed(id: string): Promise<boolean> {
   const item = await db.lineItems.get(id);
   if (!item) return false;
 
   const confirmed = !item.confirmed;
-  await db.lineItems.update(id, { confirmed });
+  const timestamp = nowIso();
+  await db.lineItems.update(id, { confirmed, updatedAt: timestamp });
+  const updated = (await db.lineItems.get(id))!;
+  await syncRecord('line_items', updated);
   return confirmed;
 }
 
-export async function setLineItemConfirmed(id: number, confirmed: boolean): Promise<void> {
-  await db.lineItems.update(id, { confirmed });
+export async function setLineItemConfirmed(id: string, confirmed: boolean): Promise<void> {
+  const timestamp = nowIso();
+  await db.lineItems.update(id, { confirmed, updatedAt: timestamp });
+  const item = await db.lineItems.get(id);
+  if (item) {
+    await syncRecord('line_items', item);
+  }
 }
 
-export async function deleteLineItem(id: number): Promise<void> {
+export async function deleteLineItem(id: string): Promise<void> {
+  const item = await db.lineItems.get(id);
+  if (!item) return;
+
   await db.lineItems.delete(id);
+  await syncRecord('line_items', item, { delete: true });
 }
 
-export async function getTripSubtotal(tripId: number): Promise<number> {
+export async function getTripSubtotal(tripId: string): Promise<number> {
   const items = await db.lineItems.where('tripId').equals(tripId).toArray();
   return items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
 }

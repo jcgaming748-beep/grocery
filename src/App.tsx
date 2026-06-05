@@ -1,14 +1,32 @@
 import { NavLink, Route, Routes } from 'react-router-dom';
 
+import MigrationModal from '@/components/MigrationModal';
+import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import HomePage from '@/pages/HomePage';
 import ListPage from '@/pages/ListPage';
+import LoginPage from '@/pages/LoginPage';
 import ReviewPage from '@/pages/ReviewPage';
 import ShopPage from '@/pages/ShopPage';
 import TripDetailPage from '@/pages/TripDetailPage';
 
-export default function App() {
+function AuthenticatedApp() {
+  const { session, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="page">
+        <p className="empty">Loading…</p>
+      </div>
+    );
+  }
+
+  if (!session) {
+    return <LoginPage />;
+  }
+
   return (
-    <div className="app">
+    <>
+      <MigrationModal />
       <main className="app-main">
         <Routes>
           <Route path="/" element={<HomePage />} />
@@ -30,6 +48,16 @@ export default function App() {
           Shop
         </NavLink>
       </nav>
+    </>
+  );
+}
+
+export default function App() {
+  return (
+    <div className="app">
+      <AuthProvider>
+        <AuthenticatedApp />
+      </AuthProvider>
     </div>
   );
 }

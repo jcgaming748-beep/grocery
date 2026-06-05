@@ -3,7 +3,7 @@ import { useState } from 'react';
 import type { LineItem } from '@/db/schema';
 
 type Props = {
-  item: LineItem & { id: number };
+  item: LineItem;
   onSave: (updates: { quantity: number; unitPrice: number }) => void;
   onDelete: () => void;
   onClose: () => void;

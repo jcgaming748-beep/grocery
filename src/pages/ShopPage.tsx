@@ -38,7 +38,7 @@ export default function ShopPage() {
   const [manualQty, setManualQty] = useState('1');
   const [manualImageBlob, setManualImageBlob] = useState<Blob | null>(null);
   const [manualPreviewUrl, setManualPreviewUrl] = useState<string | null>(null);
-  const [editingItem, setEditingItem] = useState<(LineItem & { id: number }) | null>(null);
+  const [editingItem, setEditingItem] = useState<LineItem | null>(null);
   const [itemName, setItemName] = useState('');
   const [itemQty, setItemQty] = useState('1');
   const [itemPrice, setItemPrice] = useState('');

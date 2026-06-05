@@ -1,0 +1,140 @@
+import { db } from '@/db/database';
+import { PRODUCT_IMAGES_BUCKET, requireSupabase } from '@/lib/supabase';
+import type { RemoteLineItem, RemoteProduct, RemoteShoppingTrip } from '@/lib/supabaseTypes';
+import { uploadProductImageIfNeeded } from '@/sync/imageSync';
+import { incrementOutboxRetry, listOutboxEntries, removeOutboxEntry } from '@/sync/outbox';
+
+export async function pushChanges(userId: string): Promise<void> {
+  const client = requireSupabase();
+  const entries = await listOutboxEntries();
+
+  for (const entry of entries) {
+    try {
+      if (entry.operation === 'delete') {
+        const { error } = await client.from(entry.entity).delete().eq('id', entry.entityId);
+        if (error) throw error;
+        await removeOutboxEntry(entry.localId!);
+        continue;
+      }
+
+      const { error } = await client.from(entry.entity).upsert(entry.payload);
+      if (error) throw error;
+
+      if (entry.entity === 'products' && entry.pendingImageUpload) {
+        const product = await db.products.get(entry.entityId);
+        if (product) {
+          await uploadProductImageIfNeeded(product, userId);
+        }
+      }
+
+      const syncedAt = new Date().toISOString();
+      if (entry.entity === 'products') {
+        await db.products.update(entry.entityId, { syncedAt });
+      } else if (entry.entity === 'shopping_trips') {
+        await db.shoppingTrips.update(entry.entityId, { syncedAt });
+      } else if (entry.entity === 'line_items') {
+        await db.lineItems.update(entry.entityId, { syncedAt });
+      }
+
+      await removeOutboxEntry(entry.localId!);
+    } catch (error) {
+      await incrementOutboxRetry(entry.localId!);
+      throw error;
+    }
+  }
+}
+
+export async function cloudHasAnyData(userId: string): Promise<boolean> {
+  const client = requireSupabase();
+
+  const [products, trips] = await Promise.all([
+    client.from('products').select('id').eq('user_id', userId).limit(1),
+    client.from('shopping_trips').select('id').eq('user_id', userId).limit(1),
+  ]);
+
+  if (products.error) throw products.error;
+  if (trips.error) throw trips.error;
+
+  return (products.data?.length ?? 0) > 0 || (trips.data?.length ?? 0) > 0;
+}
+
+export async function bulkUploadAll(userId: string): Promise<void> {
+  const client = requireSupabase();
+  const [products, trips, lineItems] = await Promise.all([
+    db.products.toArray(),
+    db.shoppingTrips.toArray(),
+    db.lineItems.toArray(),
+  ]);
+
+  if (products.length > 0) {
+    const rows: RemoteProduct[] = products.map((product) => ({
+      id: product.id,
+      user_id: userId,
+      barcode: product.barcode,
+      name: product.name,
+      default_unit_price: product.defaultUnitPrice,
+      category: product.category,
+      last_used_at: product.lastUsedAt,
+      image_path: product.imagePath,
+      updated_at: product.updatedAt,
+    }));
+    const { error } = await client.from('products').upsert(rows);
+    if (error) throw error;
+
+    for (const product of products) {
+      if (product.imageBlob && !product.imagePath) {
+        await uploadProductImageIfNeeded(product, userId);
+      }
+    }
+  }
+
+  if (trips.length > 0) {
+    const rows: RemoteShoppingTrip[] = trips.map((trip) => ({
+      id: trip.id,
+      user_id: userId,
+      date: trip.date,
+      store_name: trip.storeName,
+      notes: trip.notes,
+      status: trip.status,
+      receipt_total: trip.receiptTotal,
+      updated_at: trip.updatedAt,
+    }));
+    const { error } = await client.from('shopping_trips').upsert(rows);
+    if (error) throw error;
+  }
+
+  if (lineItems.length > 0) {
+    const rows: RemoteLineItem[] = lineItems.map((item) => ({
+      id: item.id,
+      user_id: userId,
+      trip_id: item.tripId,
+      product_name: item.productName,
+      barcode: item.barcode,
+      quantity: item.quantity,
+      unit_price: item.unitPrice,
+      product_id: item.productId,
+      confirmed: item.confirmed,
+      updated_at: item.updatedAt,
+    }));
+    const { error } = await client.from('line_items').upsert(rows);
+    if (error) throw error;
+  }
+
+  const syncedAt = new Date().toISOString();
+  await db.transaction('rw', db.products, db.shoppingTrips, db.lineItems, async () => {
+    for (const product of products) {
+      await db.products.update(product.id, { syncedAt });
+    }
+    for (const trip of trips) {
+      await db.shoppingTrips.update(trip.id, { syncedAt });
+    }
+    for (const item of lineItems) {
+      await db.lineItems.update(item.id, { syncedAt });
+    }
+  });
+}
+
+export async function deleteRemoteProductImage(imagePath: string): Promise<void> {
+  const client = requireSupabase();
+  await client.storage.from(PRODUCT_IMAGES_BUCKET).remove([imagePath]);
+}

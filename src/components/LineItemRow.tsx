@@ -6,7 +6,7 @@ import type { LineItem } from '@/db/schema';
 import { lineItemTotal } from '@/db/schema';
 
 type Props = {
-  item: LineItem & { id: number };
+  item: LineItem;
   onPress?: () => void;
   onDelete?: () => void;
 };

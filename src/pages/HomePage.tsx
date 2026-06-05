@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
 import SpendingSummaryCard from '@/components/SpendingSummaryCard';
+import SyncStatusBadge from '@/components/SyncStatusBadge';
+import { useAuth } from '@/contexts/AuthContext';
 import {
   createPlanningTrip,
   deleteTrip,
@@ -9,6 +11,7 @@ import {
   listTripsWithTotals,
 } from '@/db/repositories/trips';
 import { TRIP_STATUS_LABELS, type TripStatus, type TripWithTotal } from '@/db/schema';
+import { useRefreshOnSync } from '@/hooks/useSyncStatus';
 
 function statusClass(status: TripStatus): string {
   return `trip-badge trip-badge-${status.replace('_', '-')}`;
@@ -16,6 +19,7 @@ function statusClass(status: TripStatus): string {
 
 export default function HomePage() {
   const navigate = useNavigate();
+  const { signOut } = useAuth();
   const [trips, setTrips] = useState<TripWithTotal[]>([]);
   const [summary, setSummary] = useState({ weekTotal: 0, monthTotal: 0 });
 
@@ -27,6 +31,8 @@ export default function HomePage() {
   useEffect(() => {
     refresh();
   }, [refresh]);
+
+  useRefreshOnSync(refresh);
 
   async function handleNewList() {
     await createPlanningTrip();
@@ -50,8 +56,14 @@ export default function HomePage() {
 
   return (
     <div className="page">
-      <header className="page-header">
+      <header className="page-header page-header-row">
         <h1>Grocery Tracker</h1>
+        <div className="page-header-actions">
+          <SyncStatusBadge />
+          <button type="button" className="btn-link sign-out-link" onClick={() => signOut()}>
+            Sign out
+          </button>
+        </div>
       </header>
 
       <SpendingSummaryCard weekTotal={summary.weekTotal} monthTotal={summary.monthTotal} />

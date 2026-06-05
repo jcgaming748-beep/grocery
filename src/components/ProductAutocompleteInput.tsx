@@ -12,7 +12,7 @@ type Props = {
 export default function ProductAutocompleteInput({ onSelectProduct, onAddFreeText }: Props) {
   const [query, setQuery] = useState('');
   const [suggestions, setSuggestions] = useState<Product[]>([]);
-  const [thumbUrls, setThumbUrls] = useState<Map<number, string>>(new Map());
+  const [thumbUrls, setThumbUrls] = useState<Map<string, string>>(new Map());
 
   useEffect(() => {
     let cancelled = false;
@@ -26,9 +26,9 @@ export default function ProductAutocompleteInput({ onSelectProduct, onAddFreeTex
 
       setSuggestions(results);
 
-      const urls = new Map<number, string>();
+      const urls = new Map<string, string>();
       for (const product of results) {
-        if (product.id != null && product.imageBlob) {
+        if (product.imageBlob) {
           urls.set(product.id, blobToObjectUrl(product.imageBlob)!);
         }
       }
@@ -88,7 +88,7 @@ export default function ProductAutocompleteInput({ onSelectProduct, onAddFreeTex
                   onSelectProduct(product);
                   setQuery('');
                 }}>
-                {product.id != null && thumbUrls.has(product.id) ? (
+                {thumbUrls.has(product.id) ? (
                   <img src={thumbUrls.get(product.id)} alt="" className="line-item-thumb" />
                 ) : (
                   <div className="line-item-thumb line-item-thumb-placeholder" />

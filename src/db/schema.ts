@@ -1,17 +1,22 @@
+export type EntityId = string;
+
 export type Product = {
-  id?: number;
+  id: EntityId;
   barcode: string;
   name: string;
   defaultUnitPrice: number | null;
   category: string | null;
   lastUsedAt: string | null;
+  imagePath: string | null;
   imageBlob: Blob | null;
+  updatedAt: string;
+  syncedAt: string | null;
 };
 
 export type PendingScan = {
   barcode: string;
   productName: string;
-  productId: number | null;
+  productId: EntityId | null;
   category: string | null;
   defaultUnitPrice: number | null;
   imageBlob: Blob | null;
@@ -20,30 +25,61 @@ export type PendingScan = {
 export type TripStatus = 'planning' | 'shopping' | 'pending_review' | 'complete';
 
 export type ShoppingTrip = {
-  id?: number;
+  id: EntityId;
   date: string;
   storeName: string | null;
   notes: string | null;
   status: TripStatus;
   receiptTotal: number | null;
+  updatedAt: string;
+  syncedAt: string | null;
 };
 
 export type LineItem = {
-  id?: number;
-  tripId: number;
+  id: EntityId;
+  tripId: EntityId;
   productName: string;
   barcode: string | null;
   quantity: number;
   unitPrice: number;
-  productId: number | null;
+  productId: EntityId | null;
   confirmed: boolean;
+  updatedAt: string;
+  syncedAt: string | null;
 };
 
 export type TripWithTotal = ShoppingTrip & {
-  id: number;
   subtotal: number;
   itemCount: number;
 };
+
+export type SyncEntity = 'products' | 'shopping_trips' | 'line_items';
+
+export type SyncOperation = 'upsert' | 'delete';
+
+export type OutboxEntry = {
+  localId?: number;
+  entityId: EntityId;
+  entity: SyncEntity;
+  operation: SyncOperation;
+  payload: Record<string, unknown>;
+  createdAt: string;
+  retryCount: number;
+  pendingImageUpload: boolean;
+};
+
+export type SyncMeta = {
+  key: string;
+  value: string;
+};
+
+export function newId(): EntityId {
+  return crypto.randomUUID();
+}
+
+export function nowIso(): string {
+  return new Date().toISOString();
+}
 
 export function lineItemTotal(item: Pick<LineItem, 'quantity' | 'unitPrice'>): number {
   return item.quantity * item.unitPrice;

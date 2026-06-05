@@ -1,11 +1,13 @@
 import { db } from '@/db/database';
 import type { Product } from '@/db/schema';
+import { newId, nowIso } from '@/db/schema';
+import { syncRecord } from '@/sync/syncAfterWrite';
 
 export async function getProductByBarcode(barcode: string): Promise<Product | undefined> {
   return db.products.where('barcode').equals(barcode).first();
 }
 
-export async function getProduct(id: number): Promise<Product | undefined> {
+export async function getProduct(id: string): Promise<Product | undefined> {
   return db.products.get(id);
 }
 
@@ -16,15 +18,17 @@ export async function upsertProduct(input: {
   category?: string | null;
   imageBlob?: Blob | null;
 }): Promise<Product> {
-  const now = new Date().toISOString();
+  const timestamp = nowIso();
   const existing = await getProductByBarcode(input.barcode);
+  const pendingImageUpload = input.imageBlob !== undefined && input.imageBlob !== null;
 
-  if (existing?.id != null) {
+  if (existing) {
     const patch: Partial<Product> = {
       name: input.name,
       defaultUnitPrice: input.defaultUnitPrice ?? existing.defaultUnitPrice,
       category: input.category ?? existing.category,
-      lastUsedAt: now,
+      lastUsedAt: timestamp,
+      updatedAt: timestamp,
     };
 
     if (input.imageBlob !== undefined) {
@@ -32,27 +36,45 @@ export async function upsertProduct(input: {
     }
 
     await db.products.update(existing.id, patch);
-    return (await db.products.get(existing.id))!;
+    const updated = (await db.products.get(existing.id))!;
+    await syncRecord('products', updated, { pendingImageUpload });
+    return updated;
   }
 
-  const id = await db.products.add({
+  const product: Product = {
+    id: newId(),
     barcode: input.barcode,
     name: input.name,
     defaultUnitPrice: input.defaultUnitPrice ?? null,
     category: input.category ?? null,
-    lastUsedAt: now,
+    lastUsedAt: timestamp,
+    imagePath: null,
     imageBlob: input.imageBlob ?? null,
-  });
+    updatedAt: timestamp,
+    syncedAt: null,
+  };
 
-  return (await db.products.get(id))!;
+  await db.products.put(product);
+  await syncRecord('products', product, { pendingImageUpload });
+  return product;
 }
 
-export async function updateProductPrice(id: number, defaultUnitPrice: number): Promise<void> {
-  await db.products.update(id, { defaultUnitPrice });
+export async function updateProductPrice(id: string, defaultUnitPrice: number): Promise<void> {
+  const timestamp = nowIso();
+  await db.products.update(id, { defaultUnitPrice, updatedAt: timestamp });
+  const product = await db.products.get(id);
+  if (product) {
+    await syncRecord('products', product);
+  }
 }
 
-export async function updateProductImage(id: number, imageBlob: Blob | null): Promise<void> {
-  await db.products.update(id, { imageBlob });
+export async function updateProductImage(id: string, imageBlob: Blob | null): Promise<void> {
+  const timestamp = nowIso();
+  await db.products.update(id, { imageBlob, updatedAt: timestamp });
+  const product = await db.products.get(id);
+  if (product) {
+    await syncRecord('products', product, { pendingImageUpload: imageBlob != null });
+  }
 }
 
 export async function searchProductsByName(query: string, limit = 8): Promise<Product[]> {

@@ -14,9 +14,9 @@ import {
 
 export default function TripDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const tripId = Number(id);
-  const [trip, setTrip] = useState<(ShoppingTrip & { id: number }) | null>(null);
-  const [items, setItems] = useState<(LineItem & { id: number })[]>([]);
+  const tripId = id ?? '';
+  const [trip, setTrip] = useState<ShoppingTrip | null>(null);
+  const [items, setItems] = useState<LineItem[]>([]);
 
   const refresh = useCallback(async () => {
     const t = await getTrip(tripId);
