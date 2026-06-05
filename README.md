@@ -31,9 +31,19 @@ Built with **React + Vite + TypeScript**. Data syncs to **Supabase** and is cach
 
 3. In **Authentication → Providers**, enable **Email** sign-in.
 
-4. Copy your project **URL** and **anon public key** from **Project Settings → API**.
+4. In **Authentication → URL Configuration**, set:
+   - **Site URL:** `https://grocery-five-theta.vercel.app` (your Vercel URL)
+   - **Redirect URLs:** add both:
+     - `https://grocery-five-theta.vercel.app/**`
+     - `http://localhost:5173/**` (for local dev)
 
-5. Create `.env` from the example:
+   This fixes confirmation emails linking to `localhost` instead of your phone app.
+
+   Optional: under **Authentication → Providers → Email**, turn off **Confirm email** if you want instant sign-in without email links (fine for a private household app).
+
+5. Copy your project **URL** and **anon public key** from **Project Settings → API**.
+
+6. Create `.env` from the example:
 
 ```bash
 cp .env.example .env
@@ -47,8 +57,6 @@ VITE_SUPABASE_ANON_KEY=your-anon-key
 ```
 
 6. Add the same variables in **Vercel → Project → Settings → Environment Variables**, then redeploy.
-
-## Shared household account
 
 Create **one account** (email + password) and sign in on both phones with the same credentials. All trips and product photos sync to that account.
 

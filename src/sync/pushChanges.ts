@@ -1,12 +1,30 @@
 import { db } from '@/db/database';
+import type { OutboxEntry, SyncEntity } from '@/db/schema';
 import { PRODUCT_IMAGES_BUCKET, requireSupabase } from '@/lib/supabase';
 import type { RemoteLineItem, RemoteProduct, RemoteShoppingTrip } from '@/lib/supabaseTypes';
 import { uploadProductImageIfNeeded } from '@/sync/imageSync';
 import { incrementOutboxRetry, listOutboxEntries, removeOutboxEntry } from '@/sync/outbox';
 
+const UPSERT_ORDER: Record<SyncEntity, number> = {
+  products: 0,
+  shopping_trips: 1,
+  line_items: 2,
+};
+
+function sortOutboxEntries(entries: OutboxEntry[]): OutboxEntry[] {
+  const upserts = entries
+    .filter((entry) => entry.operation === 'upsert')
+    .sort((a, b) => UPSERT_ORDER[a.entity] - UPSERT_ORDER[b.entity]);
+  const deletes = entries
+    .filter((entry) => entry.operation === 'delete')
+    .sort((a, b) => UPSERT_ORDER[b.entity] - UPSERT_ORDER[a.entity]);
+
+  return [...upserts, ...deletes];
+}
+
 export async function pushChanges(userId: string): Promise<void> {
   const client = requireSupabase();
-  const entries = await listOutboxEntries();
+  const entries = sortOutboxEntries(await listOutboxEntries());
 
   for (const entry of entries) {
     try {

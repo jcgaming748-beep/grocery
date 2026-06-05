@@ -1,4 +1,5 @@
 import { isSupabaseConfigured } from '@/lib/supabase';
+import { formatSyncError } from '@/lib/syncError';
 import { pullChanges } from '@/sync/pullChanges';
 import { pushChanges } from '@/sync/pushChanges';
 
@@ -57,8 +58,7 @@ async function runSync(): Promise<void> {
       await pullChanges(currentUserId!);
       setStatus(navigator.onLine ? 'synced' : 'offline');
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Sync failed';
-      setStatus('error', message);
+      setStatus('error', formatSyncError(err));
     } finally {
       syncInFlight = null;
     }

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-import { getSyncStatus, subscribeSyncStatus, type SyncStatus } from '@/sync/syncEngine';
+import { flushSyncNow, getSyncStatus, subscribeSyncStatus, type SyncStatus } from '@/sync/syncEngine';
 
 const LABELS: Record<SyncStatus, string> = {
   idle: 'Sync',
@@ -18,10 +18,16 @@ export default function SyncStatusBadge() {
   }), []);
 
   return (
-    <span
-      className={`sync-badge sync-badge-${status}`}
-      title={error ?? undefined}>
-      {LABELS[status]}
-    </span>
+    <div className="sync-status">
+      <span className={`sync-badge sync-badge-${status}`}>{LABELS[status]}</span>
+      {status === 'error' && error ? (
+        <p className="sync-error-detail">{error}</p>
+      ) : null}
+      {status === 'error' ? (
+        <button type="button" className="btn-link sync-retry" onClick={() => void flushSyncNow()}>
+          Retry sync
+        </button>
+      ) : null}
+    </div>
   );
 }
