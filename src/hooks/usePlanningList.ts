@@ -7,10 +7,12 @@ import {
   updateLineItem,
 } from '@/db/repositories/lineItems';
 import { updateProductPrice } from '@/db/repositories/products';
+import { getDefaultStore } from '@/db/repositories/stores';
 import {
   createPlanningTrip,
   getActiveTripByStatus,
   startShopping,
+  updateTripStoreName,
 } from '@/db/repositories/trips';
 import type { LineItem, Product } from '@/db/schema';
 import { sumLineItems } from '@/db/schema';
@@ -53,6 +55,11 @@ export function usePlanningList() {
 
   const subtotal = useMemo(() => sumLineItems(items), [items]);
 
+  const defaultPreferredStoreId = useCallback(async () => {
+    const store = await getDefaultStore();
+    return store?.id ?? null;
+  }, []);
+
   const createList = useCallback(async () => {
     const trip = await createPlanningTrip();
     setTripId(trip.id);
@@ -72,11 +79,12 @@ export function usePlanningList() {
         quantity,
         unitPrice: product.defaultUnitPrice ?? 0,
         productId: product.id ?? null,
+        preferredStoreId: await defaultPreferredStoreId(),
       });
       await refresh(tripId);
       setStatusMessage(`Added ${product.name}`);
     },
-    [refresh, tripId],
+    [defaultPreferredStoreId, refresh, tripId],
   );
 
   const addFreeText = useCallback(
@@ -88,17 +96,18 @@ export function usePlanningList() {
         productName: name.trim(),
         quantity,
         unitPrice,
+        preferredStoreId: await defaultPreferredStoreId(),
       });
       await refresh(tripId);
       setStatusMessage(`Added ${name.trim()}`);
     },
-    [refresh, tripId],
+    [defaultPreferredStoreId, refresh, tripId],
   );
 
   const updateLineItemDetails = useCallback(
     async (
       lineItemId: string,
-      updates: { quantity: number; unitPrice: number },
+      updates: { quantity: number; unitPrice: number; preferredStoreId?: string | null },
       productId: string | null,
     ) => {
       if (tripId == null) return;
@@ -137,6 +146,11 @@ export function usePlanningList() {
 
   const beginShopping = useCallback(async () => {
     if (tripId == null) return null;
+
+    const defaultStore = await getDefaultStore();
+    if (defaultStore) {
+      await updateTripStoreName(tripId, defaultStore.name);
+    }
 
     await startShopping(tripId);
     setStatusMessage('Shopping started.');

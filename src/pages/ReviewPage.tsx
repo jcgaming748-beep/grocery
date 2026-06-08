@@ -4,6 +4,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import EditLineItemModal from '@/components/EditLineItemModal';
 import ReviewLineItemRow from '@/components/ReviewLineItemRow';
 import { useTripReview } from '@/hooks/useTripReview';
+import { useStores } from '@/hooks/useStores';
 
 export default function ReviewPage() {
   const { id } = useParams<{ id: string }>();
@@ -25,6 +26,7 @@ export default function ReviewPage() {
     addManualItem,
     markComplete,
   } = useTripReview(tripId);
+  const { stores } = useStores();
 
   const [editingItem, setEditingItem] = useState<(typeof items)[number] | null>(null);
   const [itemName, setItemName] = useState('');
@@ -154,6 +156,7 @@ export default function ReviewPage() {
       {editingItem ? (
         <EditLineItemModal
           item={editingItem}
+          stores={stores}
           onSave={async (updates) => {
             await updateLineItemDetails(editingItem.id, updates, editingItem.productId);
             setEditingItem(null);

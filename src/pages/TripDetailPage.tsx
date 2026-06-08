@@ -11,12 +11,14 @@ import {
   type LineItem,
   type ShoppingTrip,
 } from '@/db/schema';
+import { useStores } from '@/hooks/useStores';
 
 export default function TripDetailPage() {
   const { id } = useParams<{ id: string }>();
   const tripId = id ?? '';
   const [trip, setTrip] = useState<ShoppingTrip | null>(null);
   const [items, setItems] = useState<LineItem[]>([]);
+  const { storeNames } = useStores();
 
   const refresh = useCallback(async () => {
     const t = await getTrip(tripId);
@@ -73,7 +75,19 @@ export default function TripDetailPage() {
         {items.length === 0 ? (
           <p className="empty">No items on this trip.</p>
         ) : (
-          items.map((item) => <LineItemRow key={item.id} item={item} />)
+          items.map((item) => (
+            <LineItemRow
+              key={item.id}
+              item={item}
+              storeLabel={
+                item.purchasedStoreId
+                  ? (storeNames.get(item.purchasedStoreId) ?? null)
+                  : item.preferredStoreId
+                    ? (storeNames.get(item.preferredStoreId) ?? null)
+                    : null
+              }
+            />
+          ))
         )}
       </section>
 

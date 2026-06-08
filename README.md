@@ -7,6 +7,7 @@ Built with **React + Vite + TypeScript**. Data syncs to **Supabase** and is cach
 ## Features
 
 - **Trips** — log each shopping trip with a running total
+- **Stores** — track where each item was bought; assign stores when planning a list
 - **Grocery list** — plan before the store with product autocomplete
 - **Shop** — accept receipt total (wife-friendly) or scan barcodes (optional)
 - **Review** — confirm line items against the receipt at home
@@ -28,6 +29,7 @@ Built with **React + Vite + TypeScript**. Data syncs to **Supabase** and is cach
 2. In the **SQL Editor**, run these files in order:
    - [`supabase/migrations/001_initial.sql`](supabase/migrations/001_initial.sql) — tables + RLS
    - [`supabase/migrations/002_storage.sql`](supabase/migrations/002_storage.sql) — product photo bucket
+   - [`supabase/migrations/004_stores.sql`](supabase/migrations/004_stores.sql) — stores catalog + per-item store tracking (backfills Fareway for existing data)
 
 3. In **Authentication → Providers**, enable **Email** sign-in.
 

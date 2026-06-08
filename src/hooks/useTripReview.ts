@@ -46,7 +46,7 @@ export function useTripReview(tripId: string) {
   const updateLineItemDetails = useCallback(
     async (
       lineItemId: string,
-      updates: { quantity: number; unitPrice: number },
+      updates: { quantity: number; unitPrice: number; preferredStoreId?: string | null },
       productId: string | null,
     ) => {
       await updateLineItem(lineItemId, updates);

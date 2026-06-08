@@ -1,16 +1,18 @@
 import { db } from '@/db/database';
-import type { LineItem, Product, ShoppingTrip, SyncEntity, SyncOperation } from '@/db/schema';
+import type { LineItem, Product, ShoppingTrip, Store, SyncEntity, SyncOperation } from '@/db/schema';
 import { nowIso } from '@/db/schema';
-import { lineItemToRemote, productToRemote, tripToRemote } from '@/sync/mappers';
+import { lineItemToRemote, productToRemote, storeToRemote, tripToRemote } from '@/sync/mappers';
 
 function entityPayload(
   entity: SyncEntity,
-  record: Product | ShoppingTrip | LineItem,
+  record: Product | Store | ShoppingTrip | LineItem,
   userId: string,
 ): Record<string, unknown> {
   switch (entity) {
     case 'products':
       return productToRemote(record as Product, userId);
+    case 'stores':
+      return storeToRemote(record as Store, userId);
     case 'shopping_trips':
       return tripToRemote(record as ShoppingTrip, userId);
     case 'line_items':
@@ -21,7 +23,7 @@ function entityPayload(
 export async function enqueueSync(input: {
   entity: SyncEntity;
   operation: SyncOperation;
-  record: Product | ShoppingTrip | LineItem;
+  record: Product | Store | ShoppingTrip | LineItem;
   userId: string;
   pendingImageUpload?: boolean;
 }): Promise<void> {

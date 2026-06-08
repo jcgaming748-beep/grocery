@@ -33,6 +33,8 @@ export async function addLineItem(input: {
   quantity?: number;
   unitPrice?: number;
   productId?: string | null;
+  preferredStoreId?: string | null;
+  purchasedStoreId?: string | null;
   confirmed?: boolean;
 }): Promise<LineItem> {
   const timestamp = nowIso();
@@ -44,6 +46,8 @@ export async function addLineItem(input: {
     quantity: input.quantity ?? 1,
     unitPrice: input.unitPrice ?? 0,
     productId: input.productId ?? null,
+    preferredStoreId: input.preferredStoreId ?? null,
+    purchasedStoreId: input.purchasedStoreId ?? null,
     confirmed: input.confirmed ?? false,
     updatedAt: timestamp,
     syncedAt: null,
@@ -72,6 +76,8 @@ export async function updateLineItem(
     productId?: string | null;
     barcode?: string | null;
     productName?: string;
+    preferredStoreId?: string | null;
+    purchasedStoreId?: string | null;
   },
 ): Promise<void> {
   const timestamp = nowIso();

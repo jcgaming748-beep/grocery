@@ -1,5 +1,12 @@
 export type EntityId = string;
 
+export type Store = {
+  id: EntityId;
+  name: string;
+  updatedAt: string;
+  syncedAt: string | null;
+};
+
 export type Product = {
   id: EntityId;
   barcode: string;
@@ -43,6 +50,8 @@ export type LineItem = {
   quantity: number;
   unitPrice: number;
   productId: EntityId | null;
+  preferredStoreId: EntityId | null;
+  purchasedStoreId: EntityId | null;
   confirmed: boolean;
   updatedAt: string;
   syncedAt: string | null;
@@ -53,7 +62,7 @@ export type TripWithTotal = ShoppingTrip & {
   itemCount: number;
 };
 
-export type SyncEntity = 'products' | 'shopping_trips' | 'line_items';
+export type SyncEntity = 'products' | 'stores' | 'shopping_trips' | 'line_items';
 
 export type SyncOperation = 'upsert' | 'delete';
 

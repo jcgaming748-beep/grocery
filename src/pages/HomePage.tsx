@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
 import SpendingSummaryCard from '@/components/SpendingSummaryCard';
+import StoresPanel from '@/components/StoresPanel';
 import SyncStatusBadge from '@/components/SyncStatusBadge';
 import { useAuth } from '@/contexts/AuthContext';
 import {
@@ -12,6 +13,7 @@ import {
 } from '@/db/repositories/trips';
 import { TRIP_STATUS_LABELS, type TripStatus, type TripWithTotal } from '@/db/schema';
 import { useRefreshOnSync } from '@/hooks/useSyncStatus';
+import { useStores } from '@/hooks/useStores';
 
 function statusClass(status: TripStatus): string {
   return `trip-badge trip-badge-${status.replace('_', '-')}`;
@@ -22,6 +24,7 @@ export default function HomePage() {
   const { signOut } = useAuth();
   const [trips, setTrips] = useState<TripWithTotal[]>([]);
   const [summary, setSummary] = useState({ weekTotal: 0, monthTotal: 0 });
+  const { stores, createStore } = useStores();
 
   const refresh = useCallback(async () => {
     setTrips(await listTripsWithTotals());
@@ -67,6 +70,13 @@ export default function HomePage() {
       </header>
 
       <SpendingSummaryCard weekTotal={summary.weekTotal} monthTotal={summary.monthTotal} />
+
+      <StoresPanel
+        stores={stores}
+        onAddStore={async (name) => {
+          await createStore(name);
+        }}
+      />
 
       <button type="button" className="btn-primary btn-block" onClick={handleNewList}>
         New grocery list

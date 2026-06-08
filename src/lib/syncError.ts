@@ -1,7 +1,7 @@
 import { db } from '@/db/database';
-import type { LineItem, Product, ShoppingTrip, SyncEntity } from '@/db/schema';
+import type { LineItem, Product, ShoppingTrip, Store, SyncEntity } from '@/db/schema';
 import { requireSupabase } from '@/lib/supabase';
-import { lineItemToRemote, productToRemote, tripToRemote } from '@/sync/mappers';
+import { lineItemToRemote, productToRemote, storeToRemote, tripToRemote } from '@/sync/mappers';
 
 function friendlyDbError(message: string): string | null {
   const lower = message.toLowerCase();
@@ -66,10 +66,12 @@ export async function ensureAuthenticatedSession(userId: string): Promise<void> 
 async function getLocalRecord(
   entity: SyncEntity,
   id: string,
-): Promise<Product | ShoppingTrip | LineItem | undefined> {
+): Promise<Product | Store | ShoppingTrip | LineItem | undefined> {
   switch (entity) {
     case 'products':
       return db.products.get(id);
+    case 'stores':
+      return db.stores.get(id);
     case 'shopping_trips':
       return db.shoppingTrips.get(id);
     case 'line_items':
@@ -79,12 +81,14 @@ async function getLocalRecord(
 
 export function buildRemotePayload(
   entity: SyncEntity,
-  record: Product | ShoppingTrip | LineItem,
+  record: Product | Store | ShoppingTrip | LineItem,
   userId: string,
 ): Record<string, unknown> {
   switch (entity) {
     case 'products':
       return productToRemote(record as Product, userId);
+    case 'stores':
+      return storeToRemote(record as Store, userId);
     case 'shopping_trips':
       return tripToRemote(record as ShoppingTrip, userId);
     case 'line_items':

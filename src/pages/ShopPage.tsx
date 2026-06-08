@@ -7,8 +7,10 @@ import EditLineItemModal from '@/components/EditLineItemModal';
 import LineItemRow from '@/components/LineItemRow';
 import ProductPhotoInput from '@/components/ProductPhotoInput';
 import ScanConfirmModal from '@/components/ScanConfirmModal';
+import StorePicker from '@/components/StorePicker';
 import TextCommandInput from '@/components/TextCommandInput';
 import { useShoppingTrip } from '@/hooks/useShoppingTrip';
+import { useStores } from '@/hooks/useStores';
 import type { LineItem, PendingScan } from '@/db/schema';
 
 export default function ShopPage() {
@@ -16,8 +18,10 @@ export default function ShopPage() {
     tripId,
     items,
     subtotal,
+    activeStoreId,
     statusMessage,
     clearStatusMessage,
+    setActiveStore,
     handleBarcodeScan,
     confirmScanAdd,
     saveManualProduct,
@@ -28,6 +32,7 @@ export default function ShopPage() {
     addManualItem,
     finishWithReceiptTotal,
   } = useShoppingTrip();
+  const { stores, storeNames } = useStores();
 
   const [scannerOpen, setScannerOpen] = useState(false);
   const [acceptTotalOpen, setAcceptTotalOpen] = useState(false);
@@ -130,6 +135,18 @@ export default function ShopPage() {
           <span className="trip-total-amount">${subtotal.toFixed(2)}</span>
         </div>
 
+        {stores.length > 0 ? (
+          <StorePicker
+            stores={stores}
+            value={activeStoreId}
+            onChange={(storeId) => {
+              if (storeId) void setActiveStore(storeId);
+            }}
+            label="Shopping at"
+            allowNone={false}
+          />
+        ) : null}
+
         {statusMessage ? (
           <button type="button" className="status-banner" onClick={clearStatusMessage}>
             {statusMessage}
@@ -144,6 +161,13 @@ export default function ShopPage() {
               <LineItemRow
                 key={item.id}
                 item={item}
+                storeLabel={
+                  item.purchasedStoreId
+                    ? (storeNames.get(item.purchasedStoreId) ?? null)
+                    : item.preferredStoreId
+                      ? (storeNames.get(item.preferredStoreId) ?? null)
+                      : null
+                }
                 onPress={() => setEditingItem(item)}
                 onDelete={async () => {
                   if (!window.confirm(`Remove ${item.productName} from this trip?`)) return;
@@ -311,6 +335,7 @@ export default function ShopPage() {
       {editingItem ? (
         <EditLineItemModal
           item={editingItem}
+          stores={stores}
           onSave={async (updates) => {
             await updateLineItemDetails(editingItem.id, updates, editingItem.productId);
             setEditingItem(null);

@@ -1,10 +1,16 @@
 import { useState } from 'react';
 
-import type { LineItem } from '@/db/schema';
+import StorePicker from '@/components/StorePicker';
+import type { LineItem, Store } from '@/db/schema';
 
 type Props = {
   item: LineItem;
-  onSave: (updates: { quantity: number; unitPrice: number }) => void;
+  stores: Store[];
+  onSave: (updates: {
+    quantity: number;
+    unitPrice: number;
+    preferredStoreId: string | null;
+  }) => void;
   onDelete: () => void;
   onUnlinkCatalog?: () => void;
   onClose: () => void;
@@ -12,6 +18,7 @@ type Props = {
 
 export default function EditLineItemModal({
   item,
+  stores,
   onSave,
   onDelete,
   onUnlinkCatalog,
@@ -21,6 +28,7 @@ export default function EditLineItemModal({
   const [unitPrice, setUnitPrice] = useState(
     item.unitPrice === 0 ? '' : String(item.unitPrice),
   );
+  const [preferredStoreId, setPreferredStoreId] = useState<string | null>(item.preferredStoreId);
 
   function handleSave() {
     const parsedQty = parseFloat(quantity);
@@ -29,7 +37,7 @@ export default function EditLineItemModal({
     if (!Number.isFinite(parsedQty) || parsedQty <= 0) return;
     if (!Number.isFinite(parsedPrice) || parsedPrice < 0) return;
 
-    onSave({ quantity: parsedQty, unitPrice: parsedPrice });
+    onSave({ quantity: parsedQty, unitPrice: parsedPrice, preferredStoreId });
   }
 
   return (
@@ -59,6 +67,14 @@ export default function EditLineItemModal({
           placeholder="0.00"
           value={unitPrice}
           onChange={(e) => setUnitPrice(e.target.value)}
+        />
+
+        <StorePicker
+          stores={stores}
+          value={preferredStoreId}
+          onChange={setPreferredStoreId}
+          label="Buy at"
+          noneLabel="No store assigned"
         />
 
         <button type="button" className="btn-primary btn-block" onClick={handleSave}>

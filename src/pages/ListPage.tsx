@@ -5,6 +5,7 @@ import EditLineItemModal from '@/components/EditLineItemModal';
 import LineItemRow from '@/components/LineItemRow';
 import ProductAutocompleteInput from '@/components/ProductAutocompleteInput';
 import { usePlanningList } from '@/hooks/usePlanningList';
+import { useStores } from '@/hooks/useStores';
 
 export default function ListPage() {
   const navigate = useNavigate();
@@ -22,6 +23,7 @@ export default function ListPage() {
     removeLineItem,
     beginShopping,
   } = usePlanningList();
+  const { stores, storeNames } = useStores();
 
   const [editingItem, setEditingItem] = useState<(typeof items)[number] | null>(null);
 
@@ -65,6 +67,9 @@ export default function ListPage() {
               <LineItemRow
                 key={item.id}
                 item={item}
+                storeLabel={
+                  item.preferredStoreId ? (storeNames.get(item.preferredStoreId) ?? null) : null
+                }
                 onPress={() => setEditingItem(item)}
                 onDelete={async () => {
                   if (!window.confirm(`Remove ${item.productName} from the list?`)) return;
@@ -96,6 +101,7 @@ export default function ListPage() {
       {editingItem ? (
         <EditLineItemModal
           item={editingItem}
+          stores={stores}
           onSave={async (updates) => {
             await updateLineItemDetails(editingItem.id, updates, editingItem.productId);
             setEditingItem(null);

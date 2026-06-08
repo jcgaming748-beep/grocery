@@ -6,14 +6,15 @@ import {
   formatSyncError,
   refreshOutboxPayload,
 } from '@/lib/syncError';
-import type { RemoteLineItem, RemoteProduct, RemoteShoppingTrip } from '@/lib/supabaseTypes';
+import type { RemoteLineItem, RemoteProduct, RemoteShoppingTrip, RemoteStore } from '@/lib/supabaseTypes';
 import { uploadProductImageIfNeeded } from '@/sync/imageSync';
 import { incrementOutboxRetry, listOutboxEntries, removeOutboxEntry } from '@/sync/outbox';
 
 const UPSERT_ORDER: Record<SyncEntity, number> = {
   products: 0,
-  shopping_trips: 1,
-  line_items: 2,
+  stores: 1,
+  shopping_trips: 2,
+  line_items: 3,
 };
 
 function sortOutboxEntries(entries: OutboxEntry[]): OutboxEntry[] {
@@ -67,6 +68,8 @@ export async function pushChanges(userId: string): Promise<void> {
       const syncedAt = new Date().toISOString();
       if (entry.entity === 'products') {
         await db.products.update(entry.entityId, { syncedAt });
+      } else if (entry.entity === 'stores') {
+        await db.stores.update(entry.entityId, { syncedAt });
       } else if (entry.entity === 'shopping_trips') {
         await db.shoppingTrips.update(entry.entityId, { syncedAt });
       } else if (entry.entity === 'line_items') {
@@ -99,8 +102,9 @@ export async function bulkUploadAll(userId: string): Promise<void> {
   const client = requireSupabase();
   await ensureAuthenticatedSession(userId);
 
-  const [products, trips, lineItems] = await Promise.all([
+  const [products, stores, trips, lineItems] = await Promise.all([
     db.products.toArray(),
+    db.stores.toArray(),
     db.shoppingTrips.toArray(),
     db.lineItems.toArray(),
   ]);
@@ -131,6 +135,17 @@ export async function bulkUploadAll(userId: string): Promise<void> {
     }
   }
 
+  if (stores.length > 0) {
+    const rows: RemoteStore[] = stores.map((store) => ({
+      id: store.id,
+      user_id: userId,
+      name: store.name,
+      updated_at: store.updatedAt,
+    }));
+    const { error } = await client.from('stores').upsert(rows, { onConflict: 'id' });
+    if (error) throw error;
+  }
+
   if (trips.length > 0) {
     const rows: RemoteShoppingTrip[] = trips.map((trip) => ({
       id: trip.id,
@@ -156,6 +171,8 @@ export async function bulkUploadAll(userId: string): Promise<void> {
       quantity: item.quantity,
       unit_price: item.unitPrice,
       product_id: item.productId,
+      preferred_store_id: item.preferredStoreId,
+      purchased_store_id: item.purchasedStoreId,
       confirmed: item.confirmed,
       updated_at: item.updatedAt,
     }));
@@ -164,9 +181,12 @@ export async function bulkUploadAll(userId: string): Promise<void> {
   }
 
   const syncedAt = new Date().toISOString();
-  await db.transaction('rw', db.products, db.shoppingTrips, db.lineItems, async () => {
+  await db.transaction('rw', db.products, db.stores, db.shoppingTrips, db.lineItems, async () => {
     for (const product of products) {
       await db.products.update(product.id, { syncedAt });
+    }
+    for (const store of stores) {
+      await db.stores.update(store.id, { syncedAt });
     }
     for (const trip of trips) {
       await db.shoppingTrips.update(trip.id, { syncedAt });

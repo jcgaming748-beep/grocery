@@ -1,12 +1,12 @@
 import { db } from '@/db/database';
-import type { LineItem, Product, ShoppingTrip, SyncEntity } from '@/db/schema';
+import type { LineItem, Product, ShoppingTrip, Store, SyncEntity } from '@/db/schema';
 import { enqueueSync } from '@/sync/outbox';
 import { requestSync } from '@/sync/syncEngine';
 import { getSyncUserId } from '@/sync/syncContext';
 
 export async function syncRecord(
   entity: SyncEntity,
-  record: Product | ShoppingTrip | LineItem,
+  record: Product | Store | ShoppingTrip | LineItem,
   options?: { pendingImageUpload?: boolean; delete?: boolean },
 ): Promise<void> {
   const userId = getSyncUserId();

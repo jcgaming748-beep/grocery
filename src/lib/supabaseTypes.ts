@@ -10,6 +10,13 @@ export type RemoteProduct = {
   updated_at: string;
 };
 
+export type RemoteStore = {
+  id: string;
+  user_id: string;
+  name: string;
+  updated_at: string;
+};
+
 export type RemoteShoppingTrip = {
   id: string;
   user_id: string;
@@ -30,6 +37,8 @@ export type RemoteLineItem = {
   quantity: number;
   unit_price: number;
   product_id: string | null;
+  preferred_store_id: string | null;
+  purchased_store_id: string | null;
   confirmed: boolean;
   updated_at: string;
 };

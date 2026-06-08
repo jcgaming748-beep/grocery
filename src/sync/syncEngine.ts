@@ -56,8 +56,8 @@ async function runSync(): Promise<void> {
     try {
       await ensureAuthenticatedSession(currentUserId!);
       await verifyDatabaseReachable();
-      await pushChanges(currentUserId!);
       await pullChanges(currentUserId!);
+      await pushChanges(currentUserId!);
       setStatus(navigator.onLine ? 'synced' : 'offline');
     } catch (err) {
       setStatus('error', formatSyncError(err));

@@ -7,8 +7,9 @@ import {
   updateLineItem,
 } from '@/db/repositories/lineItems';
 import { getProductByBarcode, upsertProduct, updateProductPrice } from '@/db/repositories/products';
-import { acceptReceiptTotal, getActiveTripByStatus } from '@/db/repositories/trips';
-import type { LineItem, PendingScan } from '@/db/schema';
+import { getDefaultStore, getStore, getStoreByName } from '@/db/repositories/stores';
+import { acceptReceiptTotal, getActiveTripByStatus, updateTripStoreName } from '@/db/repositories/trips';
+import type { LineItem, PendingScan, ShoppingTrip } from '@/db/schema';
 import { sumLineItems } from '@/db/schema';
 import { lookupBarcodeOnline } from '@/services/barcodeLookup';
 import {
@@ -21,32 +22,57 @@ import { useRefreshOnSync } from '@/hooks/useSyncStatus';
 
 export function useShoppingTrip() {
   const [tripId, setTripId] = useState<string | null>(null);
+  const [trip, setTrip] = useState<ShoppingTrip | null>(null);
   const [items, setItems] = useState<LineItem[]>([]);
+  const [activeStoreId, setActiveStoreId] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
   const refreshItems = useCallback(async (id: string) => {
     setItems(await listLineItemsForTrip(id));
   }, []);
 
+  const resolveActiveStore = useCallback(async (activeTrip: ShoppingTrip) => {
+    if (activeTrip.storeName) {
+      const store = await getStoreByName(activeTrip.storeName);
+      if (store) {
+        setActiveStoreId(store.id);
+        return;
+      }
+    }
+
+    const defaultStore = await getDefaultStore();
+    if (defaultStore) {
+      await updateTripStoreName(activeTrip.id, defaultStore.name);
+      setTrip({ ...activeTrip, storeName: defaultStore.name });
+      setActiveStoreId(defaultStore.id);
+    }
+  }, []);
+
   const loadShoppingTrip = useCallback(async () => {
-    const trip = await getActiveTripByStatus('shopping');
-    if (trip) {
-      setTripId(trip.id);
-      await refreshItems(trip.id);
-      return trip;
+    const activeTrip = await getActiveTripByStatus('shopping');
+    if (activeTrip) {
+      setTripId(activeTrip.id);
+      setTrip(activeTrip);
+      await resolveActiveStore(activeTrip);
+      await refreshItems(activeTrip.id);
+      return activeTrip;
     }
     setTripId(null);
+    setTrip(null);
+    setActiveStoreId(null);
     setItems([]);
     return null;
-  }, [refreshItems]);
+  }, [refreshItems, resolveActiveStore]);
 
   useEffect(() => {
     loadShoppingTrip();
   }, [loadShoppingTrip]);
 
-  useRefreshOnSync(useCallback(async () => {
-    await loadShoppingTrip();
-  }, [loadShoppingTrip]));
+  useRefreshOnSync(
+    useCallback(async () => {
+      await loadShoppingTrip();
+    }, [loadShoppingTrip]),
+  );
 
   const subtotal = useMemo(() => sumLineItems(items), [items]);
 
@@ -54,6 +80,25 @@ export function useShoppingTrip() {
     if (tripId != null) return tripId;
     throw new Error('No active shopping trip. Start shopping from the List tab.');
   }, [tripId]);
+
+  const stampPurchasedStore = useCallback(
+    (storeId: string | null) => (storeId ? { purchasedStoreId: storeId } : {}),
+    [],
+  );
+
+  const setActiveStore = useCallback(
+    async (storeId: string) => {
+      if (tripId == null) return;
+
+      const store = await getStore(storeId);
+      if (!store) return;
+
+      await updateTripStoreName(tripId, store.name);
+      setTrip((current) => (current ? { ...current, storeName: store.name } : current));
+      setActiveStoreId(storeId);
+    },
+    [tripId],
+  );
 
   const handleBarcodeScan = useCallback(
     async (barcode: string): Promise<PendingScan | { needsManualEntry: true; barcode: string }> => {
@@ -116,6 +161,8 @@ export function useShoppingTrip() {
         barcode: input.barcode,
       });
 
+      const purchased = stampPurchasedStore(activeStoreId);
+
       if (
         matchedLine?.id &&
         lineCanAcceptProductLink(matchedLine, { id: product.id, barcode: input.barcode }) &&
@@ -127,6 +174,7 @@ export function useShoppingTrip() {
           productId: product.id,
           barcode: input.barcode,
           productName: product.name,
+          ...purchased,
         });
       } else {
         await addLineItem({
@@ -136,13 +184,14 @@ export function useShoppingTrip() {
           quantity: input.quantity,
           unitPrice: input.unitPrice,
           productId: product.id ?? null,
+          ...purchased,
         });
       }
 
       await refreshItems(activeTripId);
       setStatusMessage(`Added ${product.name}`);
     },
-    [ensureTrip, items, refreshItems],
+    [activeStoreId, ensureTrip, items, refreshItems, stampPurchasedStore],
   );
 
   const saveManualProduct = useCallback(
@@ -167,17 +216,18 @@ export function useShoppingTrip() {
         quantity: input.quantity ?? 1,
         unitPrice: input.unitPrice,
         productId: product.id ?? null,
+        ...stampPurchasedStore(activeStoreId),
       });
       await refreshItems(activeTripId);
       setStatusMessage(`Saved and added ${product.name}`);
     },
-    [ensureTrip, refreshItems],
+    [activeStoreId, ensureTrip, refreshItems, stampPurchasedStore],
   );
 
   const updateLineItemDetails = useCallback(
     async (
       lineItemId: string,
-      updates: { quantity: number; unitPrice: number },
+      updates: { quantity: number; unitPrice: number; preferredStoreId?: string | null },
       productId: string | null,
     ) => {
       if (tripId == null) return;
@@ -231,6 +281,7 @@ export function useShoppingTrip() {
           productName: command.productName,
           quantity: command.quantity,
           unitPrice: command.unitPrice ?? 0,
+          ...stampPurchasedStore(activeStoreId),
         });
         await refreshItems(activeTripId);
         setStatusMessage(`Added ${command.quantity} ${command.productName}`);
@@ -257,7 +308,7 @@ export function useShoppingTrip() {
       await refreshItems(activeTripId);
       setStatusMessage(`Updated ${matchedName} to ${command.quantity}`);
     },
-    [ensureTrip, items, refreshItems],
+    [activeStoreId, ensureTrip, items, refreshItems, stampPurchasedStore],
   );
 
   const addManualItem = useCallback(
@@ -268,11 +319,12 @@ export function useShoppingTrip() {
         productName: input.name,
         quantity: input.quantity,
         unitPrice: input.unitPrice,
+        ...stampPurchasedStore(activeStoreId),
       });
       await refreshItems(activeTripId);
       setStatusMessage(`Added ${input.name}`);
     },
-    [ensureTrip, refreshItems],
+    [activeStoreId, ensureTrip, refreshItems, stampPurchasedStore],
   );
 
   const finishWithReceiptTotal = useCallback(
@@ -281,6 +333,8 @@ export function useShoppingTrip() {
 
       await acceptReceiptTotal(tripId, total);
       setTripId(null);
+      setTrip(null);
+      setActiveStoreId(null);
       setItems([]);
       setStatusMessage('Receipt total saved. Ready for review at home.');
     },
@@ -289,11 +343,14 @@ export function useShoppingTrip() {
 
   return {
     tripId,
+    trip,
     items,
     subtotal,
+    activeStoreId,
     statusMessage,
     clearStatusMessage: () => setStatusMessage(null),
     loadShoppingTrip,
+    setActiveStore,
     handleBarcodeScan,
     confirmScanAdd,
     saveManualProduct,

@@ -143,6 +143,15 @@ export async function getSpendingSummary(): Promise<{ weekTotal: number; monthTo
   return { weekTotal, monthTotal };
 }
 
+export async function updateTripStoreName(tripId: string, storeName: string): Promise<void> {
+  const timestamp = nowIso();
+  await db.shoppingTrips.update(tripId, { storeName, updatedAt: timestamp });
+  const trip = await db.shoppingTrips.get(tripId);
+  if (trip) {
+    await syncRecord('shopping_trips', trip);
+  }
+}
+
 export async function deleteTrip(id: string): Promise<void> {
   const trip = await db.shoppingTrips.get(id);
   const items = await getTripItems(id);

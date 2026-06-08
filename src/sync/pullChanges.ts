@@ -1,8 +1,8 @@
 import { db } from '@/db/database';
-import type { LineItem, Product, ShoppingTrip } from '@/db/schema';
+import type { LineItem, Product, ShoppingTrip, Store } from '@/db/schema';
 import { requireSupabase } from '@/lib/supabase';
-import type { RemoteLineItem, RemoteProduct, RemoteShoppingTrip } from '@/lib/supabaseTypes';
-import { remoteToLineItem, remoteToProduct, remoteToTrip } from '@/sync/mappers';
+import type { RemoteLineItem, RemoteProduct, RemoteShoppingTrip, RemoteStore } from '@/lib/supabaseTypes';
+import { remoteToLineItem, remoteToProduct, remoteToStore, remoteToTrip } from '@/sync/mappers';
 import { downloadProductImageIfNeeded } from '@/sync/imageSync';
 import { getLastPullAt, setLastPullAt } from '@/sync/meta';
 
@@ -10,6 +10,12 @@ async function upsertProductIfNewer(record: Product): Promise<void> {
   const existing = await db.products.get(record.id);
   if (existing && existing.updatedAt >= record.updatedAt) return;
   await db.products.put(record);
+}
+
+async function upsertStoreIfNewer(record: Store): Promise<void> {
+  const existing = await db.stores.get(record.id);
+  if (existing && existing.updatedAt >= record.updatedAt) return;
+  await db.stores.put(record);
 }
 
 async function upsertTripIfNewer(record: ShoppingTrip): Promise<void> {
@@ -29,9 +35,15 @@ export async function pullChanges(userId: string): Promise<void> {
   const since = await getLastPullAt();
   const pullStartedAt = new Date().toISOString();
 
-  const [productsRes, tripsRes, itemsRes] = await Promise.all([
+  const [productsRes, storesRes, tripsRes, itemsRes] = await Promise.all([
     client
       .from('products')
+      .select('*')
+      .eq('user_id', userId)
+      .gt('updated_at', since)
+      .order('updated_at', { ascending: true }),
+    client
+      .from('stores')
       .select('*')
       .eq('user_id', userId)
       .gt('updated_at', since)
@@ -51,6 +63,7 @@ export async function pullChanges(userId: string): Promise<void> {
   ]);
 
   if (productsRes.error) throw productsRes.error;
+  if (storesRes.error) throw storesRes.error;
   if (tripsRes.error) throw tripsRes.error;
   if (itemsRes.error) throw itemsRes.error;
 
@@ -58,6 +71,10 @@ export async function pullChanges(userId: string): Promise<void> {
     const product = remoteToProduct(remote);
     await upsertProductIfNewer(product);
     await downloadProductImageIfNeeded(product.id);
+  }
+
+  for (const remote of (storesRes.data ?? []) as RemoteStore[]) {
+    await upsertStoreIfNewer(remoteToStore(remote));
   }
 
   for (const remote of (tripsRes.data ?? []) as RemoteShoppingTrip[]) {

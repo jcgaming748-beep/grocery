@@ -17,6 +17,7 @@ import {
   type MigrationCheckResult,
 } from '@/sync/migrateLocalToCloud';
 import { setSyncUserId as setSyncContextUserId } from '@/sync/syncContext';
+import { backfillFarewayIfNeeded } from '@/sync/backfillFareway';
 import { flushSyncNow, startSyncEngine, stopSyncEngine } from '@/sync/syncEngine';
 
 type AuthContextValue = {
@@ -49,9 +50,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setMigrationCheck(check);
       } else if (check.action === 'pull_remote') {
         await migrateRemoteToLocal(next.user.id);
+        await backfillFarewayIfNeeded();
         await flushSyncNow();
         setMigrationCheck(null);
       } else {
+        await backfillFarewayIfNeeded();
         await flushSyncNow();
         setMigrationCheck(null);
       }
@@ -110,6 +113,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const runMigration = useCallback(async () => {
     if (!session?.user) return;
     await migrateLocalToCloud(session.user.id);
+    await backfillFarewayIfNeeded();
     await flushSyncNow();
     setMigrationCheck(null);
   }, [session?.user]);

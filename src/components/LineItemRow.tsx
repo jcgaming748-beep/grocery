@@ -4,11 +4,12 @@ import { useProductThumbnail } from '@/hooks/useProductThumbnail';
 
 type Props = {
   item: LineItem;
+  storeLabel?: string | null;
   onPress?: () => void;
   onDelete?: () => void;
 };
 
-export default function LineItemRow({ item, onPress, onDelete }: Props) {
+export default function LineItemRow({ item, storeLabel, onPress, onDelete }: Props) {
   const imageUrl = useProductThumbnail(item.productId, item.productName);
   const isZeroPrice = item.unitPrice === 0;
 
@@ -24,6 +25,7 @@ export default function LineItemRow({ item, onPress, onDelete }: Props) {
         <div className={`line-item-meta${isZeroPrice ? ' line-item-meta-warning' : ''}`}>
           {item.quantity} × ${item.unitPrice.toFixed(2)}
           {isZeroPrice ? ' · set price' : ''}
+          {storeLabel ? ` · ${storeLabel}` : ''}
         </div>
       </div>
       <div className={`line-item-total${isZeroPrice ? ' line-item-total-warning' : ''}`}>

@@ -1,6 +1,6 @@
 import Dexie, { type EntityTable } from 'dexie';
 
-import type { LineItem, OutboxEntry, Product, ShoppingTrip, SyncMeta } from '@/db/schema';
+import type { LineItem, OutboxEntry, Product, ShoppingTrip, Store, SyncMeta } from '@/db/schema';
 import { newId, nowIso } from '@/db/schema';
 
 type LegacyProduct = {
@@ -104,6 +104,8 @@ async function migrateLegacyBackupToUuidStores(tx: LegacyMigrationTx): Promise<v
       quantity: item.quantity,
       unitPrice: item.unitPrice,
       productId: item.productId != null ? (productIdMap.get(item.productId) ?? null) : null,
+      preferredStoreId: null,
+      purchasedStoreId: null,
       confirmed: item.confirmed ?? true,
       updatedAt: timestamp,
       syncedAt: null,
@@ -116,6 +118,7 @@ async function migrateLegacyBackupToUuidStores(tx: LegacyMigrationTx): Promise<v
 
 class GroceryDatabase extends Dexie {
   products!: EntityTable<Product, 'id'>;
+  stores!: EntityTable<Store, 'id'>;
   shoppingTrips!: EntityTable<ShoppingTrip, 'id'>;
   lineItems!: EntityTable<LineItem, 'id'>;
   sync_outbox!: EntityTable<OutboxEntry, 'localId'>;
@@ -220,6 +223,30 @@ class GroceryDatabase extends Dexie {
       })
       .upgrade(async (tx) => {
         await migrateLegacyBackupToUuidStores(tx);
+      });
+
+    this.version(7)
+      .stores({
+        products: 'id, &barcode, lastUsedAt, updatedAt',
+        stores: 'id, &name, updatedAt',
+        shoppingTrips: 'id, date, status, updatedAt',
+        lineItems: 'id, tripId, preferredStoreId, purchasedStoreId, [tripId+productName], updatedAt',
+        sync_outbox: '++localId, createdAt, entityId',
+        sync_meta: 'key',
+        legacy_backup: 'key',
+      })
+      .upgrade(async (tx) => {
+        await tx
+          .table('lineItems')
+          .toCollection()
+          .modify((item: LineItem) => {
+            if (item.preferredStoreId === undefined) {
+              item.preferredStoreId = null;
+            }
+            if (item.purchasedStoreId === undefined) {
+              item.purchasedStoreId = null;
+            }
+          });
       });
   }
 }
